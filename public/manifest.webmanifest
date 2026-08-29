@@ -1,0 +1,11 @@
+{
+  "name": "Taxi Real San Román · Despacho",
+  "short_name": "TRSR Despacho",
+  "description": "Plataforma de despacho digital — Taxi Real San Román",
+  "start_url": "/operadora",
+  "display": "standalone",
+  "background_color": "#0b1220",
+  "theme_color": "#0b1220",
+  "orientation": "portrait",
+  "icons": []
+}
