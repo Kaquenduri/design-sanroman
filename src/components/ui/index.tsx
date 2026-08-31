@@ -15,7 +15,7 @@ const cx = (...v: (string | false | undefined | null)[]) =>
 
 type SealProps = {
   size?: number;
-  /** Bajo ~44px el sello con texto es ilegible: se cae al distintivo corto. */
+  /** El distintivo corto se reserva para lugares que lo piden explícitamente. */
   compact?: boolean;
   className?: string;
   title?: string;
@@ -32,7 +32,7 @@ export function Seal({
   className,
   title = 'Taxi Real San Román · gremial 32-2020',
 }: SealProps) {
-  const short = compact || size < 44;
+  const short = compact;
   return (
     <svg
       viewBox="0 0 200 200"

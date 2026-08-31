@@ -47,7 +47,7 @@ export default function Home() {
     <main className={s.page}>
       <div className={s.inner}>
         <header className={s.brand}>
-          <Seal size={44} compact className={s.brandSeal} />
+          <Seal size={112} className={s.brandSeal} />
           <div className={s.brandText}>
             <span className={s.brandName}>Taxi Real San Román</span>
             <span className={s.brandMeta}>Gremial 32-2020 · Juliaca, Puno</span>

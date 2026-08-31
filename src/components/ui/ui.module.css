@@ -344,13 +344,16 @@
   padding: var(--s-4);
 }
 .cardBrand {
-  background: linear-gradient(
-    165deg,
-    var(--brand-a16),
-    var(--brand-a08) 60%,
-    transparent
-  );
-  box-shadow: inset 0 0 0 1px var(--brand-a24);
+  background: var(--brand-600);
+  color: var(--brand-fg);
+  box-shadow: var(--sh-brand);
+}
+.cardBrand .statLabel,
+.cardBrand .statSub {
+  color: var(--brand-100);
+}
+.cardBrand .statValue {
+  color: var(--brand-fg);
 }
 
 /* --------------------------------------------------------------- Sheet --- */

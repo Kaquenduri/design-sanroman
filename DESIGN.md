@@ -1,130 +1,206 @@
-# Design — Taxi Real San Román
+# Sistema de diseño — Taxi Real San Román
 
 <!-- impeccable:design-schema 1 -->
 
-## Direction
+Este documento describe la interfaz que existe en el código. La fuente de
+verdad de los tokens es `src/app/globals.css`; si un valor cambia allí, no se
+debe duplicar en componentes.
 
-**Profesional sobrio, modo Operate.** Restrained palette, una sola intención: la herramienta desaparece, el trabajo se ve. La marca vive en la precisión, no en la ornamentación. El mundo es el mismo en ambas superficies (web operadora y PWA conductor), pero la densidad y la escala cambian según quién mira y desde dónde.
+## Dirección
 
-## Why this direction
+La identidad parte del sello del gremio Real San Román, gremial 32-2020, y de
+un campo morado saturado sobre un mundo oscuro con temperatura violeta. No es
+un panel administrativo genérico: el producto debe sentirse como una central
+de taxi local, verificable y presente en la calle de Juliaca.
 
-Two users, both working, both under real conditions. The operadora sits at a console watching a live fleet for 10-hour shifts; the conductor glances at a phone mounted on a dashboard in bright Andean sun with gloved hands. Neither needs the screen to impress — both need it to be fast, legible, and unambiguous. Decoration competes with attention. Confidence lives in operational clarity, not visual flourishes. The brand speaks like an experienced dispatcher: short, direct, never raising its voice.
+El color de marca trabaja en dos escalas:
 
-## Color strategy
+- como campo completo en estados decisivos, identidad y selección;
+- como acento puntual en acciones, marcadores, numerales y foco.
 
-**Restrained** (default for Operate). One accent carries action; everything else carries information.
+Las apps móviles viven sobre el mapa. Las hojas inferiores cambian de estado,
+pero la ciudad permanece debajo y sostiene la continuidad espacial. El panel
+de operadora aumenta la densidad y permite barrer cola, mapa y detalle al mismo
+tiempo.
 
-Dark is the primary ground. Justification: the operadora's shifts span dawn and dusk with mixed indoor lighting, and the conductor's screen competes with bright sun glare — a dark ground with high-contrast foreground improves perceived contrast under both conditions, and it pairs better with the institutional-blue accent without the muddy middle tones a light theme forces. A light theme is not implemented in MVP; if added later, it must preserve the same accent relationships, not just invert the ground.
+## Tokens
 
-Every state has icon + text. Color is never the sole signal — a membership block needs the word "Bloqueada" alongside the red, and an active unit needs the dot + the word "Activa" alongside the green.
+### Marca y contraste
 
-### Tokens
+La escala `--brand-50` a `--brand-900` deriva del morado del sello. Los roles
+principales son:
 
-```
---bg:           #0B1220   /* ground, app canvas */
---surface:      #111827   /* cards, panels */
---surface-2:    #1A2233   /* elevated surfaces, hovered rows */
---surface-3:    #243049   /* dividers, strong borders */
---border:       #2C3A55   /* default border */
---fg:           #E5EAF2   /* primary foreground */
---fg-muted:     #9AA5B5   /* secondary text */
---fg-subtle:    #6B7589   /* tertiary, placeholders */
+- `--brand`: identidad, objetos grandes y numerales de unidad;
+- `--brand-600`: botones con texto pequeño, filas activas y campos saturados;
+- `--brand-hover` y `--brand-press`: interacción;
+- `--brand-fg`: texto sobre campos de marca;
+- `--brand-a08`, `--brand-a12`, `--brand-a16`, `--brand-a24` y
+  `--brand-a40`: halos, separadores y tintes translúcidos.
 
---accent:       #2563EB   /* institucional blue, primary action */
---accent-fg:    #FFFFFF
---accent-soft:  rgba(37, 99, 235, 0.12) /* tinted backgrounds */
+El blanco sobre `--brand` no alcanza AA para texto pequeño. Por eso las
+regiones con texto de interfaz usan `--brand-600`; `--brand` queda para objetos
+grandes o elementos sin texto pequeño.
 
---taxi:         #FACC15   /* taxi yellow, only for operational status of "en servicio" */
---taxi-fg:      #0B1220
+### Suelo y elevación
 
---success:      #16A34A
---warning:      #F59E0B
---danger:       #DC2626
---info:         #38BDF8
-```
+El lienzo parte de `--bg` y `--bg-deep`. Las elevaciones son `--surface`,
+`--surface-2`, `--surface-3` y `--surface-4`. Los límites usan `--border`,
+`--border-strong` y `--border-hair`.
 
-Contrast: `--fg` on `--bg` = 14.6:1. `--fg-muted` on `--bg` = 6.4:1. `--accent` on `--bg` = 6.1:1. All AA + AAA for body.
+La elevación se expresa sobre todo con `box-shadow` e inset, para no alterar la
+geometría de los componentes. Los presets son `--sh-xs`, `--sh-sm`, `--sh-md`,
+`--sh-lg`, `--sh-sheet`, `--sh-brand` y `--sh-brand-lg`.
 
-## Typography
+`--glass`, `--glass-strong` y `--glass-border` están reservados para controles
+que flotan sobre el mapa. El vidrio es funcional: mantiene el contexto urbano
+visible; no es decoración de tarjetas comunes.
 
-**Inter Variable** as the single workhorse. Free, ships variable axes, excellent at 11px and at 48px, has tabular numerals, and respects OpenType features we actually use. No display face — Inter at 600/700 weight serves the role.
+### Texto y estado
 
-**JetBrains Mono Variable** for any numeric/data where alignment matters: ETAs, placas (license plates), km, montos, IDs. Tabular by default.
+- `--fg`: contenido principal;
+- `--fg-muted`: explicación y metadatos;
+- `--fg-subtle`: etiquetas pequeñas y placeholders con contraste AA;
+- `--fg-faint`: información de muy baja jerarquía que no sea esencial.
 
-### Scale
+Los estados usan familias completas: `--success`, `--warning`, `--danger` y
+`--info`, con sus respectivos foregrounds y tintes translúcidos. El color nunca
+es la única señal: se acompaña de icono, texto o ambas cosas.
 
-Mobile (conductor app):
-```
---text-xs:   12px / 16px   /* meta, timestamps */
---text-sm:   14px / 20px   /* secondary */
---text-base: 16px / 24px   /* body floor (never below) */
---text-lg:   18px / 26px   /* primary actions labels */
---text-xl:   22px / 28px   /* screen titles */
---text-2xl:  28px / 32px   /* hero numbers (ETA, fare) */
---text-3xl:  40px / 44px   /* big status (only one per screen) */
-```
+La placa peruana es un objeto propio con `--plate-bg` y `--plate-fg`; no se
+representa como un chip de marca.
 
-Web (operadora):
-```
---text-xs:   11px / 16px
---text-sm:   12px / 18px
---text-base: 13px / 20px
---text-md:   14px / 22px
---text-lg:   16px / 24px
---text-xl:   20px / 28px
---text-2xl:  28px / 34px
---text-3xl:  40px / 44px   /* report KPIs */
-```
+### Mapa
 
-Body measure 65–75ch on web. Headings balance with `text-wrap: balance`. Numerals are tabular by default (`font-variant-numeric: tabular-nums lining-nums`).
+La familia `--map-*` define suelo, manzanas, tres jerarquías de vía, agua,
+parques y etiquetas. El asfalto siempre es más claro que la manzana para que
+las calles se lean como calles y no como zanjas.
 
-## Spacing & rhythm
+### Escala y movimiento
 
-4px base. Scale: 4, 8, 12, 16, 20, 24, 32, 40, 56, 80. A `space-above-heading > space-below-heading` rule everywhere. Cards group tightly (12–16px padding inside), separated generously (24–32px between cards).
+El espaciado usa una base de 4 px mediante `--s-1` a `--s-20`. Los radios van
+de `--r-xs` a `--r-2xl`; `--r-full` se reserva para píldoras, avatares y
+controles circulares.
 
-Container widths on web: max 1440, but the map view expands to fill viewport with side panels (320–360px) anchored left.
+La animación usa `--ease`, `--ease-out`, `--ease-spring` y las duraciones
+`--t-fast`, `--t-base`, `--t-slow`. Los movimientos comunican entrada de datos,
+cambio de estado o confirmación; no encadenan coreografías ornamentales.
 
-## Shape & elevation
+## Tipografía
 
-Corner radius: 8px for inputs/buttons, 12px for cards, 16px for sheets/modals. No fully-rounded pills except status chips and toggles.
+Las fuentes se cargan con `next/font` en `src/app/layout.tsx`:
 
-Elevation: subtle. Cards lift with a 1px `--border` plus a soft, low-spread shadow on hover only (`0 6px 16px -8px rgba(0,0,0,0.4)`). No zero-offset colored halos. No glass, no blur as decoration — only as functional blur behind modal sheets.
+- `--font-display`: Plus Jakarta Sans para títulos, cifras protagonistas y
+  numerales de unidad;
+- `--font-sans`: Inter para cuerpo, controles y texto operativo;
+- `--font-mono`: JetBrains Mono para placas, horas, IDs y datos que deben
+  alinearse.
 
-## Iconography
+La escala única va de `--text-2xs` a `--text-5xl`. En escritorio se concentra
+en los tamaños pequeños y medios para permitir escaneo; en móvil sube de escala
+para lectura de un vistazo. Títulos y cifras usan `--tracking-tight`; etiquetas
+en mayúsculas usan `--tracking-caps`. Montos, tiempos y comparables usan
+numerales tabulares.
 
-**Lucide Icons** as the icon library. 1.5px stroke, 20px default on mobile, 16px on web. Outline by default, filled variant reserved for active states. Never mix emoji, unicode glyphs, or raster icons. No icon-as-color-signal without a text label beside it.
+## Identidad gremial
 
-## Motion
+El sello es la pieza de confianza principal. Debe mostrar “REAL / SAN ROMÁN /
+32 2020” cuando aparece como identidad o verificación. El modo `compact` es
+solo un distintivo para espacios realmente pequeños, como estados de 13–30 px;
+no sustituye al sello protagonista.
 
-One authored moment per surface:
-- **Conductor app**: incoming-request alert slides up from the bottom as a full-bleed sheet with a brief haptic pattern simulation (visible on screen). All other transitions are 180ms eased-out, no entrance choreography.
-- **Operadora web**: when a new request enters the queue, it slides in from the right with a 220ms ease-out and the unit pin on the map pulses once. No other entrance animations. New-data is the only thing that animates; static state does not.
+El sello completo aparece a escala grande en el índice y en la tarjeta de
+unidad asignada del cliente. Se combina con otros dos objetos del dominio:
 
-All motion respects `prefers-reduced-motion: reduce` with a hard crossfade fallback.
+- el numeral grande pintado en la unidad (`UnitBadge`);
+- la placa peruana (`Plate`).
 
-## Layout primitives
+La combinación sello + numeral + placa permite verificar el auto antes de
+subir. No se reemplaza por un icono abstracto ni por una fotografía genérica.
 
-- **Mobile frames**: viewport locked to 390×844 in CSS via max-widths; on viewports >430px the canvas centers inside a "phone frame" (rounded 36px, 12px bezel, drop shadow) on a neutral stage. Touch simulation via pointer events.
-- **Web shell**: fixed top bar (56px) + left rail nav (240px) + main canvas. The main canvas is a 3-zone composition on the dispatcher view: side queue (320px) + map (flex) + side detail (340px) when something is selected.
-- No fixed pixel positions that fight viewport resize. Web breakpoints: ≥1280 full layout, 1024–1279 collapses right detail, <1024 switches to stacked mode (not a target audience but graceful).
+## Composición móvil: mapa + hoja inferior
 
-## Surfaces
+`AppShell` mantiene este orden de capas:
 
-This design system feeds two surfaces. Each has its own brief and its own decisions on top of this foundation:
+1. `MapLayer` como suelo permanente;
+2. `TopChrome` y controles flotantes;
+3. `BottomStack` con la hoja y, cuando corresponde, las pestañas.
 
-- `conductor-app.md` — PWA mobile, mode Operate, hand-glance density.
-- `operadora-web.md` — desktop web admin, mode Operate, scanner density.
+Al cambiar de estado se reemplaza el contenido de la hoja, no el mapa. Las
+hojas usan radios superiores grandes, sombra ascendente y una acción primaria
+clara. Los estados persistentes o decisivos pueden tomar toda la hoja con
+`--brand-600`: el viaje en curso es el ejemplo vinculante.
 
-## Anti-patterns (binding bans)
+Toda pantalla con hoja inferior encuadra puntos con `fitCamera()`. `camera()`
+centra geométricamente, pero deja la acción detrás de la hoja. `fitCamera()`
+desplaza la cámara hacia la banda visible mediante `band` y añade el padding
+necesario.
 
-- No glass / blur as decoration.
-- No gradient text.
-- No hard-offset block shadows (no `4px 4px 0` neo-brutalism).
-- No kicker/eyebrow text above headings.
-- No "01 / 02 / 03" section numbers.
-- No cards-of-icon-plus-heading-plus-text as the page structure.
-- No sparkline, progress ring, or soft-shadowed rectangle standing in for real data.
-- No emoji or unicode glyph as iconography.
-- No `border-left` colored stripe on cards/alerts; status uses full surface tint instead.
-- No modal for tasks that don't need protected focus.
-- No mock data labeled as real — every fabricated number is marked synthetic.
+Los marcadores reciben `k={markerScale(view)}` porque sus trazos están en
+unidades del mundo SVG. Sin esa compensación se agrandan en encuadres cerrados.
+
+## Motor cartográfico
+
+`src/lib/city.ts` define un mundo compartido y determinista de 1600 × 1200
+unidades, centrado tarifariamente en la Plaza de Armas. Con semilla fija genera
+manzanas y conserva el mismo árbol en servidor y cliente.
+
+`CityMap` compone:
+
+- calles locales, secundarias y arteriales;
+- casing oscuro debajo del asfalto para leer cruces y jerarquía vial;
+- manzanas, parques, río y referencias urbanas;
+- anillos tarifarios concéntricos sobre la Plaza de Armas;
+- rutas, puntos y unidades aportados como `children`.
+
+El mundo desborda el casco a propósito para evitar bandas vacías al mover la
+cámara. Las etiquetas se reducen en encuadres cerrados y los rótulos de anillo
+se dibujan después de los marcadores para conservar legibilidad.
+
+## Panel de operadora
+
+La vista de despacho es una composición de cola + mapa + detalle. La navegación
+vive en una franja inferior reservada que no cubre el mapa. Dentro de ella, un
+dock de vidrio oscuro reúne iconos, etiquetas y contadores con una presencia
+inspirada en la interfaz de Apple. La ruta activa toma una cápsula elevada y
+los nombres permanecen disponibles para tecnologías de asistencia.
+
+La solicitud elegida toma una superficie morada completa. Es el patrón de
+selección a escala de región y no debe degradarse a un borde lateral.
+
+## Componentes y reglas
+
+El kit vive en `src/components/ui`. Si falta una variante reutilizable, se
+añade allí o en el módulo CSS de la superficie; no se resuelve con estilos
+inline.
+
+Reglas vinculantes:
+
+- no escribir colores literales en componentes; usar tokens de `globals.css`;
+- no usar `style={{...}}` para maquetación o apariencia;
+- usar CSS Modules;
+- mantener targets táctiles de al menos 44 px en móvil;
+- usar Lucide para iconografía, sin mezclar emoji como iconos;
+- etiquetar todo dato inventado con `Synthetic`;
+- no crear controles de pago digital en Fase 1: el cobro es en efectivo;
+- no usar `new Date()` durante render; los relojes arrancan en `null` y se
+  actualizan en un efecto.
+
+## Patrones que se conservan
+
+- Campo saturado para selección y estado importante, con contraste comprobado.
+- Una acción primaria por hoja móvil.
+- Datos comparables alineados y con números tabulares.
+- Píldoras de estado con texto explícito.
+- Mapas sintéticos claramente identificados como tales.
+- Membresía gremial como habilitación, no como recordatorio opcional.
+
+## Antipatrones
+
+- Azul institucional o amarillo taxi como mundo visual paralelo.
+- Sello compacto usado como marca protagonista.
+- Bordes de color como único indicador de selección.
+- Pilas de tarjetas desconectadas del mapa en las apps móviles.
+- Gradientes de texto, emoji decorativos y sombras duras de bloque.
+- Vidrio en tarjetas que no flotan sobre el mapa.
+- Métricas sintéticas presentadas como datos reales.
+- `camera()` directo en una pantalla cubierta por hoja inferior.

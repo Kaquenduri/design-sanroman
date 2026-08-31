@@ -465,7 +465,7 @@ export function ClienteApp() {
                       {UNIT.marca} {UNIT.modelo}
                     </div>
                   </div>
-                  <Seal size={52} compact className={c.verifyStamp} />
+                  <Seal size={96} className={c.verifyStamp} />
                 </div>
 
                 <div className={c.verifyRow}>
@@ -505,7 +505,7 @@ export function ClienteApp() {
 
           {/* ---------------------------------------------------- En viaje --- */}
           {screen === 'trip' && (
-            <Sheet>
+            <Sheet className={c.tripSheet}>
               <div className={c.head}>
                 <div className={c.headText}>
                   <div className={c.subtitle}>Vas hacia</div>
@@ -532,7 +532,7 @@ export function ClienteApp() {
                 </IconButton>
               </div>
 
-              <div className={c.payRow} style={{ marginBottom: 0 }}>
+              <div className={`${c.payRow} ${c.payRowLast}`}>
                 <Banknote size={20} color="var(--fg-muted)" />
                 <span className={c.payBody}>
                   <span className={c.payLabel}>{formatPEN(fare.total)}</span>
