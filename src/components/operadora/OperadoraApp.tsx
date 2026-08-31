@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { TopBar } from './TopBar';
-import { SideRail } from './SideRail';
+import { BottomNav } from './SideRail';
 import { DispatcherView } from './DispatcherView';
 import { DriversView } from './DriversView';
 import { UnitsView } from './UnitsView';
@@ -24,7 +24,6 @@ export function OperadoraApp() {
     <div className={s.app}>
       <TopBar />
       <div className={s.body}>
-        <SideRail route={route} onRoute={setRoute} />
         <main className={s.main}>
           {route === 'despacho' && <DispatcherView />}
           {route === 'conductores' && <DriversView />}
@@ -33,6 +32,7 @@ export function OperadoraApp() {
           {route === 'reportes' && <ReportsView />}
         </main>
       </div>
+      <BottomNav route={route} onRoute={setRoute} />
     </div>
   );
 }

@@ -154,94 +154,133 @@
   color: var(--fg-subtle);
 }
 
-/* -------------------------------------------------------------- Riel --- */
+/* ------------------------------------------------------- Dock inferior --- */
 
-.rail {
-  width: var(--rail-w);
+/* La franja reserva su propia altura: el dock parece flotar como en Apple,
+   pero nunca se superpone a la leyenda ni a las herramientas del mapa. */
+.dockArea {
+  height: 82px;
   flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  padding: var(--s-2) var(--s-5) var(--s-3);
   background: var(--surface);
-  box-shadow: inset -1px 0 0 var(--border);
-  padding: var(--s-3) var(--s-3) var(--s-4);
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  overflow-y: auto;
+  box-shadow: inset 0 1px 0 var(--border);
 }
 
-.railLabel {
-  font-size: var(--text-2xs);
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: var(--tracking-caps);
-  color: var(--fg-faint);
-  padding: var(--s-4) 10px var(--s-2);
-}
-
-.railItem {
+.dock {
   display: flex;
   align-items: center;
-  gap: 11px;
-  padding: 9px 11px;
-  border-radius: var(--r-sm);
+  justify-content: center;
+  gap: var(--s-1);
+  min-width: 560px;
+  height: 62px;
+  padding: var(--s-1) var(--s-2);
+  border-radius: var(--r-2xl);
+  background: var(--glass);
+  backdrop-filter: blur(24px) saturate(1.45);
+  box-shadow: inset 0 0 0 1px var(--glass-border), var(--sh-lg);
+}
+
+.dockItem {
+  position: relative;
+  min-width: 94px;
+  height: 52px;
+  padding: 0 var(--s-3);
+  border-radius: var(--r-xl);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--s-2);
   color: var(--fg-muted);
-  font-size: var(--text-md);
-  font-weight: 550;
-  width: 100%;
-  text-align: left;
+  transition: color var(--t-fast) var(--ease),
+    background var(--t-base) var(--ease),
+    transform var(--t-fast) var(--ease);
+}
+
+.dockItem:hover {
+  color: var(--fg);
+  background: var(--surface-2);
+  transform: translateY(-2px);
+}
+
+.dockActive {
+  color: var(--fg);
+  background: var(--surface-3);
+  box-shadow: inset 0 0 0 1px var(--border-strong), var(--sh-sm);
+}
+
+.dockActive .dockIcon {
+  color: var(--brand-300);
+}
+
+.dockIcon {
+  position: relative;
+  width: 25px;
+  height: 25px;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+}
+
+.dockLabel {
+  font-size: var(--text-sm);
+  font-weight: 650;
+  white-space: nowrap;
+}
+
+.dockBadge {
+  position: absolute;
+  right: -9px;
+  top: -8px;
+  min-width: 19px;
+  height: 19px;
+  padding: 0 5px;
+  border-radius: var(--r-full);
+  display: grid;
+  place-items: center;
+  background: var(--brand-600);
+  color: var(--brand-fg);
+  box-shadow: 0 0 0 2px var(--glass-strong);
+  font-family: var(--font-mono);
+  font-size: var(--text-2xs);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.dockBadge[data-hot='true'] {
+  background: var(--danger);
+}
+
+.dockMore {
+  width: 46px;
+  height: 46px;
+  border-radius: var(--r-full);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--fg-subtle);
   transition: background var(--t-fast) var(--ease),
     color var(--t-fast) var(--ease);
 }
-.railItem:hover {
+
+.dockMore:hover {
   background: var(--surface-2);
   color: var(--fg);
 }
 
-.railActive {
-  background: var(--brand);
-  color: var(--brand-fg);
-  font-weight: 650;
-}
-.railActive:hover {
-  background: var(--brand-hover);
-  color: var(--brand-fg);
-}
-
-.railCount {
-  margin-left: auto;
-  font-size: var(--text-2xs);
-  font-weight: 700;
-  font-variant-numeric: tabular-nums;
-  padding: 2px 7px;
-  border-radius: var(--r-full);
-  background: var(--surface-3);
-  color: var(--fg-muted);
-}
-.railActive .railCount {
-  background: rgba(255, 255, 255, 0.22);
-  color: #fff;
-}
-
-.railFoot {
-  margin-top: auto;
-  padding: var(--s-3);
-  border-radius: var(--r-md);
-  background: var(--surface-2);
-  box-shadow: inset 0 0 0 1px var(--border);
-}
-
-.railFootTitle {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  font-size: var(--text-xs);
-  font-weight: 650;
-  margin-bottom: 5px;
-}
-
-.railFootText {
-  font-size: var(--text-xs);
-  color: var(--fg-muted);
-  line-height: 1.5;
+@media (max-width: 900px) {
+  .dock {
+    min-width: 0;
+    width: min(100%, 520px);
+  }
+  .dockItem {
+    min-width: 54px;
+    padding-inline: var(--s-2);
+  }
+  .dockLabel {
+    display: none;
+  }
 }
 
 /* --------------------------------------------------- Vista de despacho --- */

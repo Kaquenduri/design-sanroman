@@ -7,7 +7,6 @@ import {
   ShieldCheck,
   BarChart3,
   Settings,
-  Cpu,
 } from 'lucide-react';
 import s from './Operadora.module.css';
 import type { Route } from './OperadoraApp';
@@ -25,7 +24,7 @@ const ITEMS: {
   { key: 'reportes', label: 'Reportes', icon: BarChart3 },
 ];
 
-export function SideRail({
+export function BottomNav({
   route,
   onRoute,
 }: {
@@ -33,42 +32,43 @@ export function SideRail({
   onRoute: (r: Route) => void;
 }) {
   return (
-    <nav className={s.rail} aria-label="Navegación del panel">
-      {ITEMS.map((it) => {
-        const Icon = it.icon;
-        const active = it.key === route;
-        return (
-          <button
-            key={it.key}
-            className={`${s.railItem} ${active ? s.railActive : ''}`}
-            onClick={() => onRoute(it.key)}
-            aria-current={active ? 'page' : undefined}
-          >
-            <Icon size={17} strokeWidth={active ? 2.2 : 1.8} />
-            {it.label}
-            {it.count !== undefined && (
-              <span className={s.railCount}>{it.count}</span>
-            )}
-          </button>
-        );
-      })}
+    <div className={s.dockArea}>
+      <nav className={s.dock} aria-label="Navegación del panel">
+        {ITEMS.map((it) => {
+          const Icon = it.icon;
+          const active = it.key === route;
+          return (
+            <button
+              key={it.key}
+              className={`${s.dockItem} ${active ? s.dockActive : ''}`}
+              onClick={() => onRoute(it.key)}
+              aria-current={active ? 'page' : undefined}
+              title={it.label}
+            >
+              <span className={s.dockIcon}>
+                <Icon size={23} strokeWidth={active ? 2.5 : 1.9} />
+                {it.count !== undefined && (
+                  <span
+                    className={s.dockBadge}
+                    data-hot={it.key === 'despacho' ? 'true' : undefined}
+                  >
+                    {it.count}
+                  </span>
+                )}
+              </span>
+              <span className={s.dockLabel}>{it.label}</span>
+            </button>
+          );
+        })}
 
-      <div className={s.railLabel}>Sistema</div>
-      <button className={s.railItem}>
-        <Settings size={17} strokeWidth={1.8} />
-        Configuración
-      </button>
-
-      <div className={s.railFoot}>
-        <div className={s.railFootTitle}>
-          <Cpu size={13} color="var(--brand-400)" />
-          Motor de asignación
-        </div>
-        <p className={s.railFootText}>
-          Propuesta en cascada a la unidad más cercana, 22 s por intento.
-          Intervienes solo cuando la cascada se agota.
-        </p>
-      </div>
-    </nav>
+        <button
+          className={s.dockMore}
+          aria-label="Configuración"
+          title="Configuración"
+        >
+          <Settings size={22} strokeWidth={1.9} />
+        </button>
+      </nav>
+    </div>
   );
 }
