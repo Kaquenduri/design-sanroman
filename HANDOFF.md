@@ -57,12 +57,13 @@ Se reemplazó por completo el mundo visual anterior (azul institucional
 - Capturas de las 18 pantallas revisadas visualmente en dos rondas.
 - Una revisión independiente completa (ver §6, deuda pendiente).
 
-### Commit
+### Rama de trabajo
 
-Hay un commit local **sin publicar**: `3c64d3c`. Falta:
+El trabajo vive en la rama **`joshua`**, no en `main`. `main` sigue en el
+commit inicial del proyecto.
 
 ```bash
-git push origin main
+git push -u origin joshua
 ```
 
 *(quedó pendiente porque el push pide credenciales de GitHub de forma
@@ -251,7 +252,8 @@ Veredicto: `fix`. Lo urgente ya se corrigió. Queda:
 Ya está configurado. `next.config.js` activa exportación estática **solo**
 cuando `GITHUB_PAGES=true`, así que `npm run dev` no cambia.
 
-`.github/workflows/deploy.yml` construye y publica en cada push a `main`.
+`.github/workflows/deploy.yml` construye y publica en cada push a `main` **o a
+`joshua`**, que es la rama de trabajo actual.
 
 **Paso manual pendiente (una sola vez):**
 GitHub → repo → **Settings → Pages → Source: GitHub Actions**
@@ -342,7 +344,7 @@ Del cliente, en sus palabras:
 
 ## 11. Orden sugerido para continuar
 
-1. `git push origin main` y activar Pages (§7) → el avance queda visible.
+1. `git push -u origin joshua` y activar Pages (§7) → el avance queda visible.
 2. Deuda alta de §6 (sello con letras, morado a escala de región, `DESIGN.md`).
 3. Login del conductor + membresía vencida (§9).
 4. Registro, notificaciones y pantallas de contenido del cliente (§9).
