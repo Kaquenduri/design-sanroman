@@ -34,3 +34,7 @@ next-env.d.ts
 
 # impeccable review artifacts
 .impeccable/review/
+
+# local server log
+server3100.log
+

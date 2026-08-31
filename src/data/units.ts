@@ -1,5 +1,6 @@
 import { DRIVERS } from './drivers';
-import type { Unit, Membership, Coordinates } from './types';
+import { seededPoint, type WorldPoint } from '@/lib/city';
+import type { Unit, Membership, CategoryId } from './types';
 
 const PLACAS = [
   'B7X-482', 'T2K-915', 'V9M-204', 'X1P-673', 'Z4H-118',
@@ -9,21 +10,56 @@ const PLACAS = [
   'Y7Y-682', 'B1Z-417', 'E5A-953', 'G8C-218', 'J4F-764',
 ];
 
-export const UNITS: Unit[] = DRIVERS.map((d, i) => ({
-  id: d.unitId,
-  placa: PLACAS[i],
-  marca: 'Toyota',
-  modelo: 'Corolla',
-  anio: 2019 + (i % 6),
-  driverId: d.id,
-  status:
-    i < 18 ? 'active' : i < 22 ? 'on-trip' : i < 24 ? 'offline' : 'blocked',
-  lastSeenAt: new Date(Date.now() - i * 17000).toISOString(),
-}));
+/** Reparto de flota: mayoría sedán, es lo que realmente circula en Juliaca. */
+const CATEGORIES: CategoryId[] = [
+  'SEDAN', 'SEDAN', 'PROBOX', 'SEDAN', 'SEDAN',
+  'MINIVAN', 'SEDAN', 'PROBOX', 'SEDAN', 'SEDAN',
+  'SUV', 'SEDAN', 'SEDAN', 'PROBOX', 'SEDAN',
+  'MINIVAN', 'SEDAN', 'SEDAN', 'PROBOX', 'SEDAN',
+  'SEDAN', 'SUV', 'SEDAN', 'SEDAN', 'MINIVAN',
+];
+
+const MODELS: Record<CategoryId, { marca: string; modelo: string }> = {
+  SEDAN: { marca: 'Toyota', modelo: 'Corolla' },
+  PROBOX: { marca: 'Toyota', modelo: 'Probox' },
+  MINIVAN: { marca: 'Hyundai', modelo: 'H1' },
+  SUV: { marca: 'Nissan', modelo: 'X-Trail' },
+};
+
+export const UNITS: Unit[] = DRIVERS.map((d, i) => {
+  const categoryId = CATEGORIES[i];
+  const model = MODELS[categoryId];
+  return {
+    id: d.unitId,
+    n: String(i + 1).padStart(2, '0'),
+    placa: PLACAS[i],
+    marca: model.marca,
+    modelo: model.modelo,
+    anio: 2019 + (i % 6),
+    categoryId,
+    driverId: d.id,
+    status:
+      i < 16 ? 'active' : i < 21 ? 'on-trip' : i < 24 ? 'offline' : 'blocked',
+    heading: (i * 47) % 360,
+    // Reloj fijo: `Date.now()` en el módulo desincroniza servidor y cliente.
+    lastSeenAt: new Date(Date.UTC(2026, 7, 30, 14, 12, 0) - i * 17000)
+      .toISOString(),
+  };
+});
+
+/** Posiciones en coordenadas del mundo de `lib/city`. */
+export const UNIT_POSITIONS: Record<string, WorldPoint> = UNITS.reduce(
+  (acc, u, i) => {
+    acc[u.id] = seededPoint(i + 7);
+    return acc;
+  },
+  {} as Record<string, WorldPoint>
+);
 
 function addDaysISO(days: number): string {
-  const d = new Date();
-  d.setDate(d.getDate() + days);
+  // Fecha ancla fija por la misma razón que `lastSeenAt`.
+  const d = new Date(Date.UTC(2026, 7, 30));
+  d.setUTCDate(d.getUTCDate() + days);
   return d.toISOString().slice(0, 10);
 }
 
@@ -51,31 +87,3 @@ export const MEMBERSHIPS: Membership[] = DRIVERS.map((d, i) => {
     daysToExpire: -(5 + (i - 23) * 7),
   };
 });
-
-export const CITY_BOUNDS = {
-  west: -70.145,
-  east: -70.115,
-  south: -15.51,
-  north: -15.485,
-};
-
-function seededPos(seed: number): Coordinates {
-  const a = (seed * 9301 + 49297) % 233280;
-  const r1 = a / 233280;
-  const a2 = (a * 9301 + 49297) % 233280;
-  const r2 = a2 / 233280;
-  return {
-    lng: CITY_BOUNDS.west + r1 * (CITY_BOUNDS.east - CITY_BOUNDS.west),
-    lat: CITY_BOUNDS.south + r2 * (CITY_BOUNDS.north - CITY_BOUNDS.south),
-  };
-}
-
-export const UNIT_POSITIONS: Record<string, Coordinates> = UNITS.reduce(
-  (acc, u, i) => {
-    acc[u.id] = seededPos(i + 7);
-    return acc;
-  },
-  {} as Record<string, Coordinates>
-);
-
-export { seededPos };

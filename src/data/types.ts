@@ -1,5 +1,9 @@
-// Synthetic data for the Taxi Real San Román MVP mock.
-// All identifiers, names, fares, and timestamps are illustrative.
+// Datos sintéticos para el mockup de Taxi Real San Román.
+// Nombres, placas, tarifas y horas son ilustrativos — ningún dato es real.
+// Los nombres de entidad y los estados siguen el ERD del proyecto para que el
+// mockup y el modelo de datos hablen el mismo idioma.
+
+import type { WorldPoint } from '@/lib/city';
 
 export type Driver = {
   id: string;
@@ -12,16 +16,40 @@ export type Driver = {
   joinedAt: string;
 };
 
+/** `NombreCategoriaVehiculo` del ERD. */
+export type CategoryId = 'SEDAN' | 'PROBOX' | 'MINIVAN' | 'SUV';
+
+export type VehicleCategory = {
+  id: CategoryId;
+  label: string;
+  /** `capacidad_pasajeros` */
+  seats: number;
+  /** `tipo_carga` */
+  carga: 'ninguna' | 'liviana' | 'pesada';
+  /** Recargo sobre la tarifa base del anillo, en soles. */
+  extra: number;
+  /** Minutos añadidos a la espera típica: hay menos unidades de las grandes. */
+  etaOffset: number;
+  description: string;
+};
+
 export type Unit = {
   id: string;
+  /** `numero_unidad` — el numeral pintado en la puerta. */
+  n: string;
   placa: string;
   marca: string;
   modelo: string;
   anio: number;
+  categoryId: CategoryId;
   driverId: string | null;
   status: 'active' | 'on-trip' | 'offline' | 'blocked';
+  /** Rumbo en grados; 0 = norte. Solo para orientar el marcador. */
+  heading: number;
   lastSeenAt: string;
 };
+
+export type UnitStatus = Unit['status'];
 
 export type Membership = {
   driverId: string;
@@ -30,19 +58,20 @@ export type Membership = {
   daysToExpire: number;
 };
 
-export type Coordinates = { lat: number; lng: number };
-
 export type PendingRequest = {
   id: string;
   passengerName: string;
   passengerRating: number;
+  passengerSeed: string;
   pickupAddress: string;
   destinationAddress: string;
-  pickup: Coordinates;
-  destination: Coordinates;
+  pickup: WorldPoint;
+  destination: WorldPoint;
   distanceKm: number;
+  categoryId: CategoryId;
   fareEstimate: number;
   waitSeconds: number;
+  /** `app` = solicitud directa del pasajero; `telefono` = puente de la central. */
   source: 'app' | 'telefono';
   assignedUnitId: string | null;
 };
@@ -61,4 +90,16 @@ export type Trip = {
   ratingGiven: number | null;
 };
 
-export type UnitStatus = Unit['status'];
+/** `ConceptoTarifa` del ERD — el desglose línea por línea de una tarifa. */
+export type FareLine = {
+  concepto:
+    | 'BASE_ANILLO'
+    | 'AJUSTE_SUBZONA'
+    | 'RECARGO_CARGA'
+    | 'RECARGO_CLIMA'
+    | 'RECARGO_VIA'
+    | 'RECARGO_EVENTO'
+    | 'AJUSTE_MANUAL';
+  label: string;
+  amount: number;
+};

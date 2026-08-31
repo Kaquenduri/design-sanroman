@@ -1,0 +1,89 @@
+/* Escenario de vista previa: el campo morado saturado que sostiene el
+   dispositivo, igual que en la referencia del cliente. */
+
+.stage {
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--s-6);
+  padding: var(--s-6) var(--s-4) var(--s-10);
+  background: var(--brand-600);
+  background-image: radial-gradient(
+      110% 70% at 50% -8%,
+      var(--brand-400) 0%,
+      transparent 62%
+    ),
+    radial-gradient(90% 60% at 50% 108%, var(--brand-800) 0%, transparent 58%);
+}
+
+.bar {
+  width: 100%;
+  max-width: 940px;
+  display: flex;
+  align-items: center;
+  gap: var(--s-4);
+  color: #fff;
+}
+
+.back {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 40px;
+  padding: 0 16px 0 12px;
+  border-radius: var(--r-full);
+  background: rgba(255, 255, 255, 0.16);
+  font-size: var(--text-md);
+  font-weight: 650;
+  color: #fff;
+  transition: background var(--t-fast) var(--ease);
+  flex-shrink: 0;
+}
+.back:hover {
+  background: rgba(255, 255, 255, 0.26);
+}
+
+.titleBlock {
+  min-width: 0;
+}
+
+.title {
+  font-family: var(--font-display);
+  font-size: var(--text-lg);
+  font-weight: 800;
+  letter-spacing: var(--tracking-tight);
+  line-height: 1.2;
+}
+
+.subtitle {
+  font-size: var(--text-sm);
+  color: rgba(255, 255, 255, 0.78);
+  margin-top: 2px;
+}
+
+.seal {
+  margin-left: auto;
+  color: rgba(255, 255, 255, 0.5);
+  flex-shrink: 0;
+}
+
+.hint {
+  font-size: var(--text-sm);
+  color: rgba(255, 255, 255, 0.8);
+  text-align: center;
+  max-width: 46ch;
+  line-height: 1.55;
+}
+
+@media (max-width: 560px) {
+  .stage {
+    padding: 0;
+    gap: 0;
+    background: var(--bg);
+  }
+  .bar,
+  .hint {
+    display: none;
+  }
+}

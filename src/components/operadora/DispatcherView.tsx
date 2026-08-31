@@ -2,383 +2,487 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import {
-  Plus,
-  Minus,
-  Locate,
   Clock,
   MapPin,
   Navigation,
-  User as UserIcon,
-  Phone,
   PhoneCall,
-  X,
-  RefreshCw,
-  ChevronRight,
-  Truck,
+  Smartphone,
+  Plus,
+  Minus,
+  Crosshair,
+  Zap,
+  Phone,
+  ArrowRight,
 } from 'lucide-react';
-import styles from './Operadora.module.css';
+import { CityMap } from '@/components/map/CityMap';
+import {
+  RouteLine,
+  UnitMarker,
+  RequestPin,
+  DestPin,
+} from '@/components/map/MapMarkers';
+import {
+  Button,
+  IconButton,
+  Chip,
+  Avatar,
+  Stat,
+  Stars,
+  Legs,
+  Plate,
+  UnitBadge,
+  Segmented,
+  Empty,
+} from '@/components/ui';
 import {
   REQUESTS_INITIAL,
   DRIVERS,
   UNITS,
   UNIT_POSITIONS,
-  CITY_BOUNDS,
+  CATEGORY_BY_ID,
   formatPEN,
   formatKm,
-  statusLabel,
-  statusColor,
+  formatClock,
+  fareBreakdown,
   type PendingRequest,
 } from '@/data';
-import { DispatcherMap } from './DispatcherMap';
+import { routeBetween, seededPoint } from '@/lib/city';
+import s from './Operadora.module.css';
+
+const MAP_VIEW = '40 60 1520 1080';
+
+/** Unidad disponible más cercana a un punto — el KNN que corre en PostGIS. */
+function nearestUnit(p: { x: number; y: number }) {
+  let best: { id: string; d: number } | null = null;
+  for (const u of UNITS) {
+    if (u.status !== 'active') continue;
+    const q = UNIT_POSITIONS[u.id];
+    const d = Math.hypot(q.x - p.x, q.y - p.y);
+    if (!best || d < best.d) best = { id: u.id, d };
+  }
+  return best;
+}
+
+/** 1 unidad de mundo ≈ 7 m en esta ciudad sintética. */
+const toKm = (worldDistance: number) => (worldDistance * 7) / 1000;
+
+const SEEDS = [
+  { name: 'Roxana Pari', seed: 'RP', from: 'Jr. Moquegua 412', to: 'Urb. Los Olivos' },
+  { name: 'Andrés Mamani', seed: 'AM', from: 'Av. El Sol 1050', to: 'Jr. Puno 230' },
+  { name: 'Camila Quispe', seed: 'CQ', from: 'Calle 2 de Mayo 88', to: 'Mercado San José' },
+];
 
 export function DispatcherView() {
   const [requests, setRequests] = useState<PendingRequest[]>(REQUESTS_INITIAL);
-  const [selectedId, setSelectedId] = useState<string | null>(REQUESTS_INITIAL[0].id);
+  const [selectedId, setSelectedId] = useState<string | null>(
+    REQUESTS_INITIAL[0].id
+  );
   const [filter, setFilter] = useState<'all' | 'app' | 'telefono'>('all');
-  const [waitTick, setWaitTick] = useState(0);
+  const [tick, setTick] = useState(0);
 
-  // Increment wait seconds every second
   useEffect(() => {
-    const id = setInterval(() => setWaitTick((x) => x + 1), 1000);
+    const id = setInterval(() => setTick((t) => t + 1), 1000);
     return () => clearInterval(id);
   }, []);
 
-  // Simulate new requests arriving every ~25s
+  /* Llega una solicitud nueva cada ~28 s: la cola se mueve sola. */
   useEffect(() => {
-    let id = 0;
-    const interval = setInterval(() => {
-      id++;
-      const seeds = [
-        { name: 'Roxana P.', addr: 'Jr. Moquegua 412', dest: 'Urb. Los Olivos', fare: 9 },
-        { name: 'Andrés M.', addr: 'Av. El Sol 1050', dest: 'Jr. Puno 230', fare: 7.5 },
-        { name: 'Camila Q.', addr: 'Calle 2 de Mayo 88', dest: 'Mercado San José', fare: 6 },
-      ];
-      const seed = seeds[id % seeds.length];
-      const newReq: PendingRequest = {
-        id: `r-${2000 + id}`,
+    let n = 0;
+    const id = setInterval(() => {
+      n += 1;
+      const seed = SEEDS[n % SEEDS.length];
+      const pickup = seededPoint(400 + n * 13);
+      const next: PendingRequest = {
+        id: String(1048 + n),
         passengerName: seed.name,
-        passengerRating: 4.7 + Math.random() * 0.3,
-        pickupAddress: seed.addr,
-        destinationAddress: seed.dest,
-        pickup: UNIT_POSITIONS[UNITS[0].id],
-        destination: UNIT_POSITIONS[UNITS[3].id],
-        distanceKm: +(2 + Math.random() * 4).toFixed(1),
-        fareEstimate: seed.fare,
+        passengerRating: 4.7,
+        passengerSeed: seed.seed,
+        pickupAddress: seed.from,
+        destinationAddress: seed.to,
+        pickup,
+        destination: seededPoint(500 + n * 17),
+        distanceKm: 2 + (n % 4),
+        categoryId: 'SEDAN',
+        fareEstimate: fareBreakdown(pickup, CATEGORY_BY_ID.SEDAN).total,
         waitSeconds: 0,
-        source: Math.random() > 0.5 ? 'app' : 'telefono',
+        source: n % 2 === 0 ? 'app' : 'telefono',
         assignedUnitId: null,
       };
-      setRequests((rs) => [newReq, ...rs].slice(0, 10));
-    }, 25000);
-    return () => clearInterval(interval);
+      setRequests((rs) => [next, ...rs].slice(0, 9));
+    }, 28000);
+    return () => clearInterval(id);
   }, []);
 
   const filtered = useMemo(
-    () =>
-      filter === 'all'
-        ? requests
-        : requests.filter((r) => r.source === filter),
+    () => (filter === 'all' ? requests : requests.filter((r) => r.source === filter)),
     [filter, requests]
   );
 
   const selected = requests.find((r) => r.id === selectedId) ?? null;
+
   const assignedUnit = selected?.assignedUnitId
-    ? UNITS.find((u) => u.id === selected.assignedUnitId) ?? null
+    ? (UNITS.find((u) => u.id === selected.assignedUnitId) ?? null)
     : null;
   const assignedDriver = assignedUnit
-    ? DRIVERS.find((d) => d.id === assignedUnit.driverId) ?? null
+    ? (DRIVERS.find((d) => d.id === assignedUnit.driverId) ?? null)
     : null;
 
-  const fmtWait = (s: number) => {
-    const m = Math.floor(s / 60);
-    const sec = s % 60;
-    return `${m}:${String(sec).padStart(2, '0')}`;
+  const suggestion = selected && !assignedUnit ? nearestUnit(selected.pickup) : null;
+  const suggestedUnit = suggestion
+    ? (UNITS.find((u) => u.id === suggestion.id) ?? null)
+    : null;
+  const suggestedDriver = suggestedUnit
+    ? (DRIVERS.find((d) => d.id === suggestedUnit.driverId) ?? null)
+    : null;
+
+  const activeUnitId = assignedUnit?.id ?? suggestedUnit?.id ?? null;
+  const routeToPickup =
+    selected && activeUnitId
+      ? routeBetween(UNIT_POSITIONS[activeUnitId], selected.pickup, 4)
+      : null;
+
+  const assign = () => {
+    if (!selected || !suggestedUnit) return;
+    setRequests((rs) =>
+      rs.map((r) =>
+        r.id === selected.id ? { ...r, assignedUnitId: suggestedUnit.id } : r
+      )
+    );
   };
 
+  const fare = selected
+    ? fareBreakdown(selected.pickup, CATEGORY_BY_ID[selected.categoryId])
+    : null;
+
   return (
-    <div className={styles.dispatcher}>
-      <aside className={styles.queue} aria-label="Cola de solicitudes">
-        <div className={styles.queue__head}>
-          <div>
-            <div className={styles.queue__title}>Solicitudes pendientes</div>
-            <div className={styles.queue__count}>
-              {requests.length} en cola · tiempo real
-            </div>
+    <div className={s.dispatcher}>
+      {/* ------------------------------------------------------- Cola --- */}
+      <aside className={`${s.col} ${s.colQueue}`} aria-label="Cola de solicitudes">
+        <div className={s.colHead}>
+          <div className={s.colTitle}>
+            Solicitudes
+            <Chip tone="brand">{requests.length}</Chip>
           </div>
-          <button
-            className={styles.actionBtn}
-            aria-label="Actualizar"
-            onClick={() => setWaitTick((x) => x + 1)}
-          >
-            <RefreshCw size={12} />
-          </button>
-        </div>
-        <div className={styles.queue__filters}>
-          {(['all', 'app', 'telefono'] as const).map((f) => (
-            <button
-              key={f}
-              className={`${styles.chipFilter} ${filter === f ? styles['chipFilter--active'] : ''}`}
-              onClick={() => setFilter(f)}
-            >
-              {f === 'all' ? 'Todas' : f === 'app' ? 'App' : 'Teléfono'}
-            </button>
-          ))}
-        </div>
-        <div className={styles.queue__list}>
-          {filtered.map((r) => {
-            const isSel = selectedId === r.id;
-            const totalWait = r.waitSeconds + waitTick;
-            const isHot = totalWait > 90;
-            return (
-              <button
-                key={r.id}
-                className={`${styles.queueItem} ${isSel ? styles['queueItem--selected'] : ''}`}
-                onClick={() => setSelectedId(r.id)}
-                style={{ width: '100%', textAlign: 'left' }}
-              >
-                <div className={styles.queueItem__head}>
-                  <span className={styles.queueItem__id}>#{r.id}</span>
-                  <span
-                    className={`${styles.queueItem__wait} ${isHot ? styles['queueItem__wait--hot'] : ''}`}
-                  >
-                    <Clock size={10} style={{ marginRight: 4, verticalAlign: -1 }} />
-                    {fmtWait(totalWait)}
-                  </span>
-                </div>
-                <div className={styles.queueItem__passenger}>{r.passengerName}</div>
-                <div className={styles.queueItem__row}>
-                  <MapPin size={11} />
-                  <span>{r.pickupAddress}</span>
-                </div>
-                <div className={styles.queueItem__row}>
-                  <Navigation size={11} />
-                  <span>{r.destinationAddress}</span>
-                </div>
-                <div
-                  className={`${styles.queueItem__foot} ${isSel ? styles['queueItem__foot--selected'] : ''}`}
-                >
-                  <span className={styles.queueItem__price}>{formatPEN(r.fareEstimate)}</span>
-                  {r.assignedUnitId ? (
-                    <span className={styles.queueItem__assigned}>
-                      <Truck size={11} /> {r.assignedUnitId.toUpperCase()} · reasignar
-                    </span>
-                  ) : (
-                    <span style={{ display: 'inline-flex', gap: 6, alignItems: 'center' }}>
-                      {r.source === 'telefono' && (
-                        <span className={styles.sourceTag}>
-                          <PhoneCall size={10} /> Tel
-                        </span>
-                      )}
-                      <span className={styles.queueItem__assigned}>
-                        Sin asignar <ChevronRight size={11} />
-                      </span>
-                    </span>
-                  )}
-                </div>
-              </button>
-            );
-          })}
-        </div>
-      </aside>
-
-      <section className={styles.map} aria-label="Mapa de despacho">
-        <div className={styles.map__header}>
-          <div className={styles.mapBadge}>
-            <span className={styles.mapBadge__live} />
-            Mapa · Juliaca centro
-            <span style={{ color: 'var(--fg-muted)', marginLeft: 8 }}>
-              {Object.keys(UNIT_POSITIONS).length} unidades
-            </span>
-          </div>
-          <div className={styles.mapBadge}>
-            <Clock size={12} color="var(--fg-muted)" />
-            <span className="mono">
-              {new Date().toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false })}
-            </span>
+          <div className={s.colSub}>
+            {requests.filter((r) => !r.assignedUnitId).length} sin asignar · en
+            vivo
           </div>
         </div>
 
-        <div className={styles.map__canvas}>
-          <DispatcherMap
-            units={UNITS}
-            positions={UNIT_POSITIONS}
-            bounds={CITY_BOUNDS}
-            requests={requests}
-            selectedRequestId={selectedId}
+        <div className={s.colFilters}>
+          <Segmented
+            value={filter}
+            onChange={setFilter}
+            options={[
+              { value: 'all', label: 'Todas', count: requests.length },
+              {
+                value: 'app',
+                label: 'App',
+                count: requests.filter((r) => r.source === 'app').length,
+              },
+              {
+                value: 'telefono',
+                label: 'Teléfono',
+                count: requests.filter((r) => r.source === 'telefono').length,
+              },
+            ]}
           />
         </div>
 
-        <div className={styles.map__legend}>
-          <span className={styles.legendItem}>
-            <span className={styles.legendDot} style={{ background: 'var(--success)' }} />
-            Disponible
+        <div className={s.colList}>
+          {filtered.length === 0 ? (
+            <Empty icon={<Zap size={20} />} title="Sin solicitudes en este canal">
+              Cambia de filtro o espera la próxima llamada.
+            </Empty>
+          ) : (
+            filtered.map((r) => {
+              const active = r.id === selectedId;
+              const wait = r.waitSeconds + tick;
+              const hot = wait > 100;
+              return (
+                <button
+                  key={r.id}
+                  className={`${s.qItem} ${active ? s.qActive : ''}`}
+                  onClick={() => setSelectedId(r.id)}
+                  aria-pressed={active}
+                >
+                  <div className={s.qTop}>
+                    <span className={s.qId}>#{r.id}</span>
+                    {r.source === 'telefono' ? (
+                      <PhoneCall size={12} opacity={0.7} />
+                    ) : (
+                      <Smartphone size={12} opacity={0.7} />
+                    )}
+                    <span
+                      className={`${s.qWait} ${hot && !active ? s.qWaitHot : ''}`}
+                    >
+                      <Clock size={10} />
+                      {formatClock(wait)}
+                    </span>
+                  </div>
+
+                  <div className={s.qName}>{r.passengerName}</div>
+
+                  <div className={s.qRoute}>
+                    <MapPin size={11} />
+                    <span className={s.qRouteText}>{r.pickupAddress}</span>
+                  </div>
+                  <div className={s.qRoute}>
+                    <Navigation size={11} />
+                    <span className={s.qRouteText}>{r.destinationAddress}</span>
+                  </div>
+
+                  <div className={s.qFoot}>
+                    <span className={s.qFare}>{formatPEN(r.fareEstimate)}</span>
+                    {r.assignedUnitId ? (
+                      <span className={s.qAssign}>
+                        <UnitBadge
+                          n={
+                            UNITS.find((u) => u.id === r.assignedUnitId)?.n ?? '—'
+                          }
+                          size="sm"
+                        />
+                      </span>
+                    ) : (
+                      <span className={`${s.qAssign} ${s.qUnassigned}`}>
+                        Sin asignar
+                        <ArrowRight size={12} />
+                      </span>
+                    )}
+                  </div>
+                </button>
+              );
+            })
+          )}
+        </div>
+      </aside>
+
+      {/* ------------------------------------------------------- Mapa --- */}
+      <section className={s.mapZone} aria-label="Mapa de la flota">
+        <CityMap viewBox={MAP_VIEW} rings>
+          {routeToPickup && <RouteLine d={routeToPickup} />}
+
+          {UNITS.map((u) => {
+            const p = UNIT_POSITIONS[u.id];
+            return (
+              <UnitMarker
+                key={u.id}
+                x={p.x}
+                y={p.y}
+                n={u.n}
+                status={u.status}
+                heading={u.heading}
+                selected={u.id === activeUnitId}
+              />
+            );
+          })}
+
+          {requests.map((r) => (
+            <RequestPin
+              key={r.id}
+              x={r.pickup.x}
+              y={r.pickup.y}
+              selected={r.id === selectedId}
+              hot={r.waitSeconds + tick > 100}
+            />
+          ))}
+
+          {selected && (
+            <DestPin x={selected.destination.x} y={selected.destination.y} />
+          )}
+        </CityMap>
+
+        <div className={s.mapOverlayTop}>
+          <span className={s.mapChip}>
+            <span
+              style={{
+                width: 7,
+                height: 7,
+                borderRadius: 99,
+                background: 'var(--success)',
+              }}
+            />
+            Flota en vivo · {UNITS.length} unidades
           </span>
-          <span className={styles.legendItem}>
-            <span className={styles.legendDot} style={{ background: 'var(--taxi)' }} />
-            En viaje
-          </span>
-          <span className={styles.legendItem}>
-            <span className={styles.legendDot} style={{ background: 'var(--fg-subtle)' }} />
-            Sin conexión
-          </span>
-          <span className={styles.legendItem}>
-            <span className={styles.legendDot} style={{ background: 'var(--danger)' }} />
-            Bloqueada
-          </span>
+          <span className={s.mapChip}>Anillos tarifarios visibles</span>
         </div>
 
-        <div className={styles.map__controls}>
-          <button className={styles.mapControl} aria-label="Zoom in">
+        <div className={s.mapLegend}>
+          {[
+            ['var(--success)', 'Disponible'],
+            ['var(--brand-500)', 'En viaje'],
+            ['#4A4360', 'Sin conexión'],
+            ['var(--danger)', 'Bloqueada'],
+          ].map(([color, label]) => (
+            <span key={label} className={s.legendItem}>
+              <span
+                className={s.legendSwatch}
+                style={{ background: color }}
+              />
+              {label}
+            </span>
+          ))}
+        </div>
+
+        <div className={s.mapTools}>
+          <IconButton variant="glass" size="sm" aria-label="Acercar">
             <Plus size={16} />
-          </button>
-          <button className={styles.mapControl} aria-label="Zoom out">
+          </IconButton>
+          <IconButton variant="glass" size="sm" aria-label="Alejar">
             <Minus size={16} />
-          </button>
-          <button className={styles.mapControl} aria-label="Centrar">
-            <Locate size={16} />
-          </button>
+          </IconButton>
+          <IconButton variant="glass" size="sm" aria-label="Centrar en la plaza">
+            <Crosshair size={16} />
+          </IconButton>
         </div>
       </section>
 
-      <aside className={styles.detail} aria-label="Detalle">
-        {selected ? (
+      {/* ----------------------------------------------------- Detalle --- */}
+      <aside className={`${s.col} ${s.colDetail}`} aria-label="Detalle de la solicitud">
+        {!selected || !fare ? (
+          <Empty icon={<MapPin size={20} />} title="Ninguna solicitud seleccionada">
+            Elige una de la cola para ver al pasajero, la tarifa y la unidad
+            sugerida.
+          </Empty>
+        ) : (
           <>
-            <div className={styles.detail__head}>
-              <div className={styles.detail__title}>{selected.passengerName}</div>
-              <div className={styles.detail__sub}>
-                Solicitud #{selected.id} ·{' '}
-                {selected.source === 'telefono' ? 'Canal teléfono' : 'App pasajero'}
+            <div className={s.colHead}>
+              <div className={s.colTitle}>{selected.passengerName}</div>
+              <div className={s.colSub}>
+                #{selected.id} ·{' '}
+                {selected.source === 'telefono'
+                  ? 'entró por teléfono'
+                  : 'entró por la app'}
               </div>
             </div>
-            <div className={styles.detail__body}>
-              <div className={styles.kpiRow}>
-                <div className={styles.kpiCard}>
-                  <div className={styles.kpiLabel}>Tarifa est.</div>
-                  <div className={styles.kpiValue}>{formatPEN(selected.fareEstimate)}</div>
+
+            <div className={s.detailBody}>
+              <div className={s.kpiPair}>
+                <div className={s.kpiBox}>
+                  <Stat
+                    label="Tarifa"
+                    value={formatPEN(fare.total)}
+                    sub={fare.lines[0].label}
+                    size="sm"
+                  />
                 </div>
-                <div className={styles.kpiCard}>
-                  <div className={styles.kpiLabel}>Distancia</div>
-                  <div className={styles.kpiValue}>{formatKm(selected.distanceKm)}</div>
+                <div className={s.kpiBox}>
+                  <Stat
+                    label="Distancia"
+                    value={formatKm(selected.distanceKm)}
+                    sub={CATEGORY_BY_ID[selected.categoryId].label}
+                    size="sm"
+                  />
                 </div>
               </div>
 
-              <div>
-                <div className={styles.sectionTitle}>Recogida</div>
-                <div
-                  style={{
-                    background: 'var(--surface)',
-                    border: '1px solid var(--border)',
-                    borderRadius: 'var(--radius-md)',
-                    padding: 12,
-                    fontSize: 13,
-                    display: 'flex',
-                    gap: 8,
-                  }}
-                >
-                  <MapPin size={14} color="var(--accent)" style={{ marginTop: 2 }} />
-                  <span>{selected.pickupAddress}</span>
-                </div>
+              <div className={s.detailSection}>
+                <span className={s.sectionLabel}>Recorrido</span>
+                <Legs
+                  from={selected.pickupAddress}
+                  to={selected.destinationAddress}
+                />
               </div>
 
-              <div>
-                <div className={styles.sectionTitle}>Destino</div>
-                <div
-                  style={{
-                    background: 'var(--surface)',
-                    border: '1px solid var(--border)',
-                    borderRadius: 'var(--radius-md)',
-                    padding: 12,
-                    fontSize: 13,
-                    display: 'flex',
-                    gap: 8,
-                  }}
-                >
-                  <Navigation size={14} color="var(--taxi)" style={{ marginTop: 2 }} />
-                  <span>{selected.destinationAddress}</span>
+              <div className={s.detailSection}>
+                <span className={s.sectionLabel}>Pasajero</span>
+                <div className={s.assignedTop}>
+                  <Avatar initials={selected.passengerSeed} size={38} />
+                  <div className={s.suggestionBody}>
+                    <div className={s.suggestionName}>
+                      {selected.passengerName}
+                    </div>
+                    <div className={s.suggestionMeta}>
+                      <Stars value={selected.passengerRating} />
+                    </div>
+                  </div>
+                  <IconButton
+                    variant="neutral"
+                    size="sm"
+                    aria-label="Llamar al pasajero"
+                  >
+                    <Phone size={15} />
+                  </IconButton>
                 </div>
               </div>
 
               {assignedUnit && assignedDriver ? (
-                <div>
-                  <div className={styles.sectionTitle}>Unidad asignada</div>
-                  <div
-                    style={{
-                      background: 'var(--accent-soft)',
-                      border: '1px solid rgba(37,99,235,0.4)',
-                      borderRadius: 'var(--radius-md)',
-                      padding: 12,
-                      display: 'flex',
-                      flexDirection: 'column',
-                      gap: 10,
-                    }}
-                  >
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                      <div className={styles.avatarSm} style={{ width: 32, height: 32 }}>
-                        {assignedDriver.avatarSeed}
-                      </div>
-                      <div style={{ flex: 1 }}>
-                        <div style={{ fontSize: 13, fontWeight: 600 }}>
+                <div className={s.detailSection}>
+                  <span className={s.sectionLabel}>Unidad asignada</span>
+                  <div className={s.assignedCard}>
+                    <div className={s.assignedTop}>
+                      <UnitBadge n={assignedUnit.n} size="md" />
+                      <div className={s.suggestionBody}>
+                        <div className={s.suggestionName}>
                           {assignedDriver.name}
                         </div>
-                        <div
-                          className="mono"
-                          style={{ fontSize: 11, color: 'var(--fg-muted)' }}
-                        >
-                          {assignedUnit.placa} · #{assignedUnit.id.replace('u', '')}
+                        <div className={s.suggestionMeta}>
+                          {assignedUnit.marca} {assignedUnit.modelo}
                         </div>
                       </div>
-                      <button className={styles.actionBtn}>
-                        <Phone size={12} /> Llamar
-                      </button>
+                      <Plate value={assignedUnit.placa} />
                     </div>
-                    <div style={{ display: 'flex', gap: 8 }}>
-                      <button className={styles.actionBtn} style={{ flex: 1, justifyContent: 'center' }}>
+                    <div className={s.assignedActions}>
+                      <Button variant="outline" size="sm">
+                        <Phone size={14} />
+                        Llamar
+                      </Button>
+                      <Button variant="outline" size="sm">
                         Reasignar
-                      </button>
-                      <button className={styles.actionBtn} style={{ flex: 1, justifyContent: 'center' }}>
-                        Ver unidad
-                      </button>
+                      </Button>
                     </div>
                   </div>
                 </div>
               ) : (
-                <div>
-                  <div className={styles.sectionTitle}>Asignación</div>
-                  <button
-                    className={styles.actionBtn}
-                    style={{
-                      width: '100%',
-                      justifyContent: 'center',
-                      background: 'var(--accent)',
-                      color: 'var(--accent-fg)',
-                      borderColor: 'var(--accent)',
-                      padding: '12px 14px',
-                      fontSize: 13,
-                    }}
-                  >
-                    Asignar unidad más cercana
-                  </button>
-                  <div
-                    style={{
-                      fontSize: 11,
-                      color: 'var(--fg-muted)',
-                      marginTop: 8,
-                      textAlign: 'center',
-                    }}
-                  >
-                    Sugerida: U08 · 0.6 km de distancia
-                  </div>
+                <div className={s.detailSection}>
+                  <span className={s.sectionLabel}>Asignación sugerida</span>
+                  {suggestedUnit && suggestedDriver && suggestion ? (
+                    <>
+                      <div className={s.suggestion}>
+                        <UnitBadge n={suggestedUnit.n} size="md" />
+                        <div className={s.suggestionBody}>
+                          <div className={s.suggestionName}>
+                            {suggestedDriver.name}
+                          </div>
+                          <div className={s.suggestionMeta}>
+                            a {formatKm(toKm(suggestion.d))} · la más cercana
+                            disponible
+                          </div>
+                        </div>
+                      </div>
+                      <Button size="md" full onClick={assign}>
+                        <Zap size={16} />
+                        Proponer a Unidad {suggestedUnit.n}
+                      </Button>
+                    </>
+                  ) : (
+                    <Empty
+                      icon={<Zap size={18} />}
+                      title="Sin unidades disponibles"
+                    >
+                      Toda la flota está ocupada o fuera de línea.
+                    </Empty>
+                  )}
                 </div>
               )}
+
+              <div className={s.detailSection}>
+                <span className={s.sectionLabel}>Desglose de tarifa</span>
+                <div className={s.fareCard}>
+                  {fare.lines.map((l) => (
+                    <div key={l.concepto} className={s.fareRow}>
+                      <span>{l.label}</span>
+                      <span>{formatPEN(l.amount)}</span>
+                    </div>
+                  ))}
+                  <div className={`${s.fareRow} ${s.fareTotal}`}>
+                    <span>Total a cobrar</span>
+                    <span>{formatPEN(fare.total)}</span>
+                  </div>
+                </div>
+              </div>
             </div>
           </>
-        ) : (
-          <div className={styles.detail__head}>
-            <div className={styles.detail__title}>Selecciona una solicitud</div>
-            <div className={styles.detail__sub}>
-              Los detalles del pasajero y la asignación aparecerán aquí
-            </div>
-          </div>
         )}
       </aside>
     </div>

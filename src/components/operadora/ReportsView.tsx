@@ -1,276 +1,210 @@
 'use client';
 
-import { Download, TrendingUp, Star, DollarSign, Car } from 'lucide-react';
-import styles from './Operadora.module.css';
-import { DRIVERS, TODAY_TRIPS, formatPEN } from '@/data';
+import {
+  Download,
+  Banknote,
+  Car,
+  Timer,
+  Star,
+  TrendingUp,
+} from 'lucide-react';
+import {
+  Avatar,
+  Button,
+  Stat,
+  UnitBadge,
+  Synthetic,
+} from '@/components/ui';
+import { DRIVERS, UNITS, TODAY_TRIPS, formatPEN } from '@/data';
+import s from './Operadora.module.css';
+
+/* Serie horaria sintética de TODA la flota, 07:00 → 18:00.
+   Suma exactamente los viajes del día de los 25 conductores, para que el
+   gráfico, el KPI y la tabla de conductores no se contradigan entre sí. */
+const HOURLY = [12, 9, 15, 19, 16, 23, 34, 42, 31, 24, 12, 9];
+const PEAK = Math.max(...HOURLY);
+const FLEET_TRIPS = HOURLY.reduce((a, b) => a + b, 0);
+
+const EXTRA_TRIPS = [
+  { id: 'x1', t: '11:55', name: 'Lucía Mamani', from: 'Jr. Piura 245', to: 'Urb. San Francisco', fare: 8 },
+  { id: 'x2', t: '12:08', name: 'Jorge Ccama', from: 'Av. El Sol 880', to: 'Hospital C. Monge', fare: 13 },
+  { id: 'x3', t: '12:24', name: 'Eduardo Pari', from: 'Plaza de Armas', to: 'Jr. Puno 230', fare: 8 },
+  { id: 'x4', t: '12:48', name: 'Rosa Taco', from: 'Jr. Loreto 110', to: 'Mercado Túpac Amaru', fare: 10 },
+  { id: 'x5', t: '13:02', name: 'Pedro Lipa', from: 'Calle 2 de Mayo 412', to: 'Av. San Martín 1020', fare: 11.5 },
+  { id: 'x6', t: '13:18', name: 'Sara Apaza', from: 'Av. Circunvalación 230', to: 'Terminal Terrestre', fare: 8 },
+];
 
 export function ReportsView() {
-  const total = TODAY_TRIPS.reduce((acc, t) => acc + t.fare, 0);
-  const count = TODAY_TRIPS.length;
-  const avgEta = 14.2;
-  const totalHours = 6.4;
-
-  // Top 5 drivers by trips (synthetic for the day)
-  const topDrivers = [...DRIVERS]
-    .sort((a, b) => b.tripsToday - a.tripsToday)
-    .slice(0, 5);
-
-  // Trips per hour bar chart
-  const hourlyTrips = [3, 2, 1, 0, 1, 2, 3, 4, 5, 6, 8, 7];
-  const maxTrips = Math.max(...hourlyTrips);
-
-  // Combined trips list (synthetic full day)
-  const allTrips = [...TODAY_TRIPS];
-  const extendedTrips = [
-    ...allTrips,
-    ...Array.from({ length: 6 }).map((_, i) => ({
-      id: `tx-${i + 1}`,
-      driverId: DRIVERS[(i + 3) % DRIVERS.length].id,
-      unitId: `u${String((i + 3) % DRIVERS.length + 1).padStart(2, '0')}`,
-      passengerName: ['Lucía M.', 'Jorge C.', 'Eduardo P.', 'Rosa T.', 'Pedro L.', 'Sara A.'][i],
-      pickupAddress: ['Jr. Piura 245', 'Av. El Sol 880', 'Plaza de Armas', 'Jr. Loreto 110', 'Calle 2 de Mayo 412', 'Av. Circunvalación 230'][i],
-      destinationAddress: ['Urb. San Francisco', 'Hospital Carlos Monge', 'Jr. Puno 230', 'Mercado Túpac Amaru', 'Av. San Martín 1020', 'Terminal Terrestre'][i],
-      fare: [8, 12, 7, 9, 11, 6.5][i],
-      startedAt: ['11:55', '12:08', '12:24', '12:48', '13:02', '13:18'][i],
-      finishedAt: ['12:14', '12:32', '12:38', '13:04', '13:22', '13:31'][i],
-      status: 'completado' as const,
-      ratingGiven: [5, 4, 5, 5, 5, 4][i],
+  const rows = [
+    ...TODAY_TRIPS.map((t) => ({
+      id: t.id,
+      t: t.startedAt,
+      name: t.passengerName,
+      from: t.pickupAddress,
+      to: t.destinationAddress,
+      fare: t.fare,
     })),
+    ...EXTRA_TRIPS,
   ];
 
+  // La tabla es una muestra de los últimos viajes; el total del día sale de
+  // la serie horaria de la flota, no de las filas visibles.
+  const avgFare = rows.reduce((a, r) => a + r.fare, 0) / rows.length;
+  const dayTrips = FLEET_TRIPS;
+  const dayRevenue = dayTrips * avgFare;
+
+  const ranking = [...DRIVERS]
+    .sort((a, b) => b.tripsToday - a.tripsToday)
+    .slice(0, 6);
+
   return (
-    <div className={styles.page}>
-      <div className={styles.pageHeader}>
+    <div className={s.page}>
+      <div className={s.pageHead}>
         <div>
-          <h1 className={styles.pageTitle}>Reportes del día</h1>
-          <div className={styles.pageSub}>
-            {new Date().toLocaleDateString('es-PE', {
-              weekday: 'long',
-              day: 'numeric',
-              month: 'long',
-              year: 'numeric',
+          <h1 className={s.pageTitle}>Reportes del día</h1>
+          <p className={s.pageSub}>
+            Turno en curso · cierre a las 22:00
+          </p>
+        </div>
+        <div className={s.pageTools}>
+          <Button variant="outline" size="md">
+            <Download size={16} />
+            Exportar CSV
+          </Button>
+        </div>
+      </div>
+
+      <div className={s.kpiGrid}>
+        <div className={s.kpiCard}>
+          <div className={s.kpiHead}>
+            <Banknote size={15} />
+            <span className={s.sectionLabel}>Recaudado</span>
+          </div>
+          <Stat
+            label=""
+            value={formatPEN(dayRevenue)}
+            sub="100% en efectivo"
+          />
+        </div>
+        <div className={s.kpiCard}>
+          <div className={s.kpiHead}>
+            <Car size={15} />
+            <span className={s.sectionLabel}>Viajes completados</span>
+          </div>
+          <Stat
+            label=""
+            value={dayTrips}
+            sub={`${(dayTrips / HOURLY.length).toFixed(1)} por hora`}
+          />
+        </div>
+        <div className={s.kpiCard}>
+          <div className={s.kpiHead}>
+            <Timer size={15} />
+            <span className={s.sectionLabel}>ETA promedio</span>
+          </div>
+          <Stat label="" value="6.4 min" sub="de propuesta a recojo" />
+        </div>
+        <div className={s.kpiCard}>
+          <div className={s.kpiHead}>
+            <Star size={15} />
+            <span className={s.sectionLabel}>Valoración media</span>
+          </div>
+          <Stat label="" value="4.8" sub={`${dayTrips} pasajeros calificaron`} />
+        </div>
+      </div>
+
+      <div className={s.chartCard}>
+        <div className={s.chartHead}>
+          <div>
+            <span className={s.sectionLabel}>Viajes por hora</span>
+            <div
+              style={{
+                fontFamily: 'var(--font-display)',
+                fontSize: 'var(--text-xl)',
+                fontWeight: 700,
+                marginTop: 4,
+                letterSpacing: 'var(--tracking-tight)',
+              }}
+            >
+              {dayTrips} viajes de toda la flota en 12 horas
+            </div>
+          </div>
+          <span
+            style={{
+              fontSize: 'var(--text-sm)',
+              color: 'var(--fg-muted)',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 6,
+            }}
+          >
+            <TrendingUp size={14} color="var(--brand-400)" />
+            Pico a las 14:00 · {PEAK} viajes
+          </span>
+        </div>
+
+        <div className={s.chart}>
+          {HOURLY.map((v, i) => (
+            <div key={i} className={s.barCol}>
+              <span className={s.barValue}>{v}</span>
+              <div
+                className={`${s.bar} ${v === PEAK ? s.barPeak : ''}`}
+                style={{ height: `${(v / PEAK) * 100}%` }}
+              />
+              <span className={s.barLabel}>
+                {String(7 + i).padStart(2, '0')}
+              </span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div className={s.twoCol}>
+        <div className={s.chartCard}>
+          <span className={s.sectionLabel}>Unidades más activas</span>
+          <div style={{ marginTop: 'var(--s-3)' }}>
+            {ranking.map((d, i) => {
+              const u = UNITS.find((x) => x.driverId === d.id)!;
+              return (
+                <div key={d.id} className={s.rankRow}>
+                  <span className={`${s.rankN} ${i === 0 ? s.rankTop : ''}`}>
+                    {i + 1}
+                  </span>
+                  <UnitBadge n={u.n} size="sm" />
+                  <div className={s.suggestionBody}>
+                    <div className={s.suggestionName}>{d.name}</div>
+                  </div>
+                  <span className="num" style={{ fontWeight: 700 }}>
+                    {d.tripsToday}
+                  </span>
+                </div>
+              );
             })}
           </div>
         </div>
-        <button className={styles.actionBtn} style={{ padding: '9px 14px' }}>
-          <Download size={14} /> Exportar CSV
-        </button>
-      </div>
 
-      <div className={styles.kpiBigGrid}>
-        <div className={styles.kpiBig}>
-          <div
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 6,
-              marginBottom: 8,
-            }}
-          >
-            <DollarSign size={14} color="var(--accent)" />
-            <span className={styles.kpiBigLabel}>Ingresos estimados</span>
-          </div>
-          <div className={styles.kpiBigValue}>{formatPEN(total + 65.5)}</div>
-          <div className={styles.kpiBigSub}>
-            <TrendingUp size={11} style={{ display: 'inline', marginRight: 4 }} />
-            +12% vs. ayer · efectivo
-          </div>
-        </div>
-        <div className={styles.kpiBig}>
-          <div
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 6,
-              marginBottom: 8,
-            }}
-          >
-            <Car size={14} color="var(--accent)" />
-            <span className={styles.kpiBigLabel}>Viajes completados</span>
-          </div>
-          <div className={styles.kpiBigValue}>{count + 6}</div>
-          <div className={styles.kpiBigSub}>
-            {((count + 6) / 6.4).toFixed(1)} viajes/hora
-          </div>
-        </div>
-        <div className={styles.kpiBig}>
-          <div
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 6,
-              marginBottom: 8,
-            }}
-          >
-            <TrendingUp size={14} color="var(--accent)" />
-            <span className={styles.kpiBigLabel}>ETA promedio</span>
-          </div>
-          <div className={styles.kpiBigValue}>
-            {avgEta.toFixed(1)}
-            <span style={{ fontSize: 14, fontWeight: 500, color: 'var(--fg-muted)', marginLeft: 4 }}>
-              min
-            </span>
-          </div>
-          <div className={styles.kpiBigSub}>de aceptación a recogida</div>
-        </div>
-        <div className={styles.kpiBig}>
-          <div
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 6,
-              marginBottom: 8,
-            }}
-          >
-            <Star size={14} color="var(--taxi)" />
-            <span className={styles.kpiBigLabel}>Valoración media</span>
-          </div>
-          <div className={styles.kpiBigValue}>
-            4.8
-            <span style={{ fontSize: 14, fontWeight: 500, color: 'var(--fg-muted)', marginLeft: 4 }}>
-              / 5
-            </span>
-          </div>
-          <div className={styles.kpiBigSub}>
-            {(count + 6).toString()} pasajeros calificaron
-          </div>
-        </div>
-      </div>
-
-      <div
-        style={{
-          background: 'var(--surface)',
-          border: '1px solid var(--border)',
-          borderRadius: 'var(--radius-lg)',
-          padding: 20,
-        }}
-      >
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'flex-end',
-            justifyContent: 'space-between',
-            marginBottom: 16,
-          }}
-        >
-          <div>
-            <div className={styles.sectionTitle}>Viajes por hora</div>
-            <div style={{ fontSize: 20, fontWeight: 600, marginTop: 2 }}>
-              {count + 6} viajes · {totalHours.toFixed(1)}h activas
-            </div>
-          </div>
-          <div style={{ fontSize: 12, color: 'var(--fg-muted)' }}>
-            Pico: 13:00 · 8 viajes/hora
-          </div>
-        </div>
-        <div className={styles.barChartWrap}>
-          <div className={styles.barChart}>
-            {hourlyTrips.map((h, i) => (
-              <div
-                key={i}
-                className={styles.bar}
-                style={{ height: `${(h / maxTrips) * 100}%` }}
-              >
-                {h > 0 && <span className={styles.barValue}>{h}</span>}
-                <span className={styles.barLabel}>
-                  {String(7 + i).padStart(2, '0')}
-                </span>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-
-      <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns: '320px 1fr',
-          gap: 20,
-        }}
-      >
-        <div
-          style={{
-            background: 'var(--surface)',
-            border: '1px solid var(--border)',
-            borderRadius: 'var(--radius-lg)',
-            padding: 20,
-          }}
-        >
-          <div className={styles.sectionTitle}>Top 5 conductores del día</div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-            {topDrivers.map((d, idx) => (
-              <div
-                key={d.id}
-                style={{ display: 'flex', alignItems: 'center', gap: 10 }}
-              >
-                <div
-                  style={{
-                    width: 22,
-                    height: 22,
-                    borderRadius: 999,
-                    background:
-                      idx === 0 ? 'var(--taxi)' : 'var(--surface-2)',
-                    color: idx === 0 ? 'var(--taxi-fg)' : 'var(--fg-muted)',
-                    display: 'grid',
-                    placeItems: 'center',
-                    fontSize: 11,
-                    fontWeight: 700,
-                    flexShrink: 0,
-                  }}
-                >
-                  {idx + 1}
-                </div>
-                <div className={styles.avatarSm}>{d.avatarSeed}</div>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: 13, fontWeight: 600 }}>{d.name}</div>
-                </div>
-                <div
-                  className={styles.mono}
-                  style={{ fontSize: 14, fontWeight: 700 }}
-                >
-                  {d.tripsToday}
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        <div
-          style={{
-            background: 'var(--surface)',
-            border: '1px solid var(--border)',
-            borderRadius: 'var(--radius-lg)',
-            overflow: 'hidden',
-          }}
-        >
-          <div style={{ padding: '14px 20px', borderBottom: '1px solid var(--border)' }}>
-            <div className={styles.sectionTitle}>Viajes del día</div>
-          </div>
-          <table className={styles.dataTable}>
+        <div className={s.tableWrap}>
+          <table className={s.table}>
             <thead>
               <tr>
                 <th>Hora</th>
                 <th>Pasajero</th>
-                <th>Origen → Destino</th>
-                <th style={{ textAlign: 'right' }}>Tarifa</th>
+                <th>Recorrido · últimos {rows.length} registrados</th>
+                <th className={s.right}>Tarifa</th>
               </tr>
             </thead>
             <tbody>
-              {extendedTrips.map((t) => (
-                <tr key={t.id}>
-                  <td className={styles.mono} style={{ fontSize: 12 }}>
-                    {t.startedAt}
+              {rows.map((r) => (
+                <tr key={r.id}>
+                  <td className="mono" style={{ fontSize: 'var(--text-sm)' }}>
+                    {r.t}
                   </td>
-                  <td style={{ fontWeight: 500 }}>{t.passengerName}</td>
-                  <td style={{ fontSize: 12, color: 'var(--fg-muted)' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                      <span>{t.pickupAddress}</span>
-                      <span style={{ color: 'var(--fg-subtle)' }}>→</span>
-                      <span>{t.destinationAddress}</span>
-                    </div>
+                  <td className={s.cellName}>{r.name}</td>
+                  <td className={s.cellMeta} style={{ fontSize: 'var(--text-sm)' }}>
+                    {r.from} → {r.to}
                   </td>
-                  <td className={styles.mono} style={{ textAlign: 'right', fontWeight: 700 }}>
-                    {formatPEN(t.fare)}
+                  <td className={`${s.right} num`} style={{ fontWeight: 700 }}>
+                    {formatPEN(r.fare)}
                   </td>
                 </tr>
               ))}
@@ -278,6 +212,10 @@ export function ReportsView() {
           </table>
         </div>
       </div>
+
+      <Synthetic>
+        Cifras sintéticas de demostración · no provienen de operación real
+      </Synthetic>
     </div>
   );
 }

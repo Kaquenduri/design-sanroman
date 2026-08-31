@@ -1,7 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import styles from './Operadora.module.css';
+import { useState } from 'react';
 import { TopBar } from './TopBar';
 import { SideRail } from './SideRail';
 import { DispatcherView } from './DispatcherView';
@@ -9,8 +8,9 @@ import { DriversView } from './DriversView';
 import { UnitsView } from './UnitsView';
 import { MembershipsView } from './MembershipsView';
 import { ReportsView } from './ReportsView';
+import s from './Operadora.module.css';
 
-export type OperadoraRoute =
+export type Route =
   | 'despacho'
   | 'conductores'
   | 'unidades'
@@ -18,21 +18,14 @@ export type OperadoraRoute =
   | 'reportes';
 
 export function OperadoraApp() {
-  const [route, setRoute] = useState<OperadoraRoute>('despacho');
-  const [now, setNow] = useState<Date | null>(null);
-
-  useEffect(() => {
-    setNow(new Date());
-    const id = setInterval(() => setNow(new Date()), 1000);
-    return () => clearInterval(id);
-  }, []);
+  const [route, setRoute] = useState<Route>('despacho');
 
   return (
-    <div className={styles.app}>
-      <TopBar now={now} />
-      <div className={styles.body}>
+    <div className={s.app}>
+      <TopBar />
+      <div className={s.body}>
         <SideRail route={route} onRoute={setRoute} />
-        <main className={styles.main}>
+        <main className={s.main}>
           {route === 'despacho' && <DispatcherView />}
           {route === 'conductores' && <DriversView />}
           {route === 'unidades' && <UnitsView />}

@@ -1,106 +1,198 @@
-/* ============================================
-   TAXI REAL SAN ROMÁN — Design Tokens
-   Operate-grade dark theme, restrained palette.
-   ============================================ */
+/* ==========================================================================
+   TAXI REAL SAN ROMÁN — Design System
+   Brand: violeta del logo gremial 32-2020 · Juliaca, Puno
+   Dark-first. Construido para uso operativo: alto contraste, targets grandes,
+   números tabulares, jerarquía por elevación y no por bordes.
+   ========================================================================== */
 
 :root {
-  /* Color tokens — surface */
-  --bg: #0b1220;
-  --surface: #111827;
-  --surface-2: #1a2233;
-  --surface-3: #243049;
-  --border: #2c3a55;
+  /* ---------------------------------------------------------------
+     BRAND — escala derivada del violeta del logo (#8B5CF6)
+     --------------------------------------------------------------- */
+  --brand-50: #F3EFFF;
+  --brand-100: #E9E2FF;
+  --brand-200: #D6C9FF;
+  --brand-300: #BBA4FF;
+  --brand-400: #A47EFC;
+  --brand-500: #8B5CF6; /* ← logo */
+  --brand-600: #7C3AED;
+  --brand-700: #6D28D9;
+  --brand-800: #571FB0;
+  --brand-900: #43188A;
 
-  /* Color tokens — foreground */
-  --fg: #e5eaf2;
-  --fg-muted: #9aa5b5;
-  --fg-subtle: #6b7589;
+  --brand: var(--brand-500);
+  --brand-hover: #9A70F8;
+  --brand-press: var(--brand-600);
+  --brand-fg: #FFFFFF;
 
-  /* Accents */
-  --accent: #2563eb;
-  --accent-fg: #ffffff;
-  --accent-soft: rgba(37, 99, 235, 0.12);
-  --accent-soft-strong: rgba(37, 99, 235, 0.24);
+  /* Superficies translúcidas de marca — para halos, chips y estados */
+  --brand-a08: rgba(139, 92, 246, 0.08);
+  --brand-a12: rgba(139, 92, 246, 0.12);
+  --brand-a16: rgba(139, 92, 246, 0.16);
+  --brand-a24: rgba(139, 92, 246, 0.24);
+  --brand-a40: rgba(139, 92, 246, 0.4);
 
-  --taxi: #facc15;
-  --taxi-fg: #0b1220;
+  /* ---------------------------------------------------------------
+     SURFACES — negro con temperatura violeta, 5 niveles de elevación
+     --------------------------------------------------------------- */
+  --bg: #08070C;
+  --bg-deep: #050409;
+  --surface: #100E17;
+  --surface-2: #17151F;
+  --surface-3: #201D2B;
+  --surface-4: #2A2638;
 
-  /* Status */
-  --success: #16a34a;
-  --success-soft: rgba(22, 163, 74, 0.14);
-  --warning: #f59e0b;
-  --warning-soft: rgba(245, 158, 11, 0.14);
-  --danger: #dc2626;
-  --danger-soft: rgba(220, 38, 38, 0.14);
-  --info: #38bdf8;
-  --info-soft: rgba(56, 189, 248, 0.14);
+  --border: #241F33;
+  --border-strong: #37304D;
+  --border-hair: rgba(255, 255, 255, 0.06);
 
-  /* Type scale — mobile-first base */
-  --text-xs: 0.75rem;     /* 12 */
-  --text-sm: 0.875rem;    /* 14 */
-  --text-base: 1rem;      /* 16 — body floor */
-  --text-lg: 1.125rem;    /* 18 */
-  --text-xl: 1.375rem;    /* 22 */
-  --text-2xl: 1.75rem;    /* 28 */
-  --text-3xl: 2.5rem;     /* 40 */
+  /* Vidrio — overlays sobre mapa */
+  --glass: rgba(16, 14, 23, 0.82);
+  --glass-strong: rgba(8, 7, 12, 0.9);
+  --glass-border: rgba(255, 255, 255, 0.1);
 
-  --leading-tight: 1.2;
-  --leading-snug: 1.35;
-  --leading-normal: 1.5;
-  --leading-relaxed: 1.65;
+  /* ---------------------------------------------------------------
+     FOREGROUND
+     --------------------------------------------------------------- */
+  --fg: #F5F3F9;
+  --fg-muted: #A39CB5;
+  /* 5.3:1 sobre --bg. El valor anterior (#6C6482) daba 3.6:1 y no llegaba al
+     piso de 4.5:1 exigido para texto pequeño y placeholders. */
+  --fg-subtle: #8D86A1;
+  --fg-faint: #5A5372;
 
-  /* Spacing — 4px base */
-  --space-1: 4px;
-  --space-2: 8px;
-  --space-3: 12px;
-  --space-4: 16px;
-  --space-5: 20px;
-  --space-6: 24px;
-  --space-7: 28px;
-  --space-8: 32px;
-  --space-10: 40px;
-  --space-12: 48px;
-  --space-14: 56px;
-  --space-16: 64px;
-  --space-20: 80px;
+  /* ---------------------------------------------------------------
+     ESTADO — calibrados para convivir con el violeta sin competir
+     --------------------------------------------------------------- */
+  --success: #22C55E;
+  --success-fg: #6EE7A0;
+  --success-a12: rgba(34, 197, 94, 0.12);
+  --success-a24: rgba(34, 197, 94, 0.24);
 
-  /* Shape */
-  --radius-sm: 6px;
-  --radius-md: 8px;
-  --radius-lg: 12px;
-  --radius-xl: 16px;
-  --radius-full: 9999px;
+  --warning: #F59E0B;
+  --warning-fg: #FBBF24;
+  --warning-a12: rgba(245, 158, 11, 0.12);
+  --warning-a24: rgba(245, 158, 11, 0.24);
 
-  /* Elevation */
-  --shadow-card: 0 1px 0 0 rgba(255, 255, 255, 0.02) inset,
-    0 6px 16px -10px rgba(0, 0, 0, 0.5);
-  --shadow-card-hover: 0 1px 0 0 rgba(255, 255, 255, 0.04) inset,
-    0 12px 28px -12px rgba(0, 0, 0, 0.6);
-  --shadow-sheet: 0 -8px 24px -8px rgba(0, 0, 0, 0.55),
-    0 -1px 0 0 rgba(255, 255, 255, 0.04) inset;
-  --shadow-modal: 0 24px 64px -16px rgba(0, 0, 0, 0.7);
+  --danger: #EF4444;
+  --danger-fg: #F87171;
+  --danger-a12: rgba(239, 68, 68, 0.12);
+  --danger-a24: rgba(239, 68, 68, 0.24);
 
-  /* Motion */
+  --info: #38BDF8;
+  --info-fg: #7DD3FC;
+  --info-a12: rgba(56, 189, 248, 0.12);
+
+  /* Placa vehicular peruana — blanco con texto negro */
+  --plate-bg: #EDEAF2;
+  --plate-fg: #14121C;
+
+  /* ---------------------------------------------------------------
+     MAPA — paleta cartográfica propia
+     --------------------------------------------------------------- */
+  --map-land: #0C0A11;
+  --map-block: #15131E;
+  --map-block-alt: #191624;
+  --map-road-casing: #09070E;
+  /* El asfalto va SIEMPRE más claro que la manzana: al revés, las calles
+     se leen como zanjas negras en cuanto el encuadre se cierra. */
+  --map-road-local: #2B2639;
+  --map-road-secondary: #38314E;
+  --map-road-arterial: #493F68;
+  --map-water: #16233D;
+  --map-water-edge: #1E3050;
+  --map-park: #12241A;
+  --map-park-edge: #1B3526;
+  --map-label: #6C6482;
+  --map-label-strong: #8F87A5;
+
+  /* ---------------------------------------------------------------
+     TIPOGRAFÍA
+     --------------------------------------------------------------- */
+  --font-sans: var(--font-inter), system-ui, -apple-system, 'Segoe UI', Roboto,
+    sans-serif;
+  --font-display: var(--font-jakarta), var(--font-inter), system-ui, sans-serif;
+  --font-mono: var(--font-mono-jb), 'SF Mono', Menlo, Consolas, monospace;
+
+  --text-2xs: 0.6875rem; /* 11 */
+  --text-xs: 0.75rem; /* 12 */
+  --text-sm: 0.8125rem; /* 13 */
+  --text-md: 0.875rem; /* 14 */
+  --text-base: 1rem; /* 16 */
+  --text-lg: 1.125rem; /* 18 */
+  --text-xl: 1.3125rem; /* 21 */
+  --text-2xl: 1.625rem; /* 26 */
+  --text-3xl: 2rem; /* 32 */
+  --text-4xl: 2.625rem; /* 42 */
+  --text-5xl: 3.25rem; /* 52 */
+
+  --tracking-tight: -0.022em;
+  --tracking-snug: -0.012em;
+  --tracking-wide: 0.04em;
+  --tracking-caps: 0.08em;
+
+  /* ---------------------------------------------------------------
+     ESPACIADO — base 4
+     --------------------------------------------------------------- */
+  --s-1: 4px;
+  --s-2: 8px;
+  --s-3: 12px;
+  --s-4: 16px;
+  --s-5: 20px;
+  --s-6: 24px;
+  --s-7: 28px;
+  --s-8: 32px;
+  --s-10: 40px;
+  --s-12: 48px;
+  --s-16: 64px;
+  --s-20: 80px;
+
+  /* ---------------------------------------------------------------
+     FORMA — radios generosos, estilo app moderna
+     --------------------------------------------------------------- */
+  --r-xs: 8px;
+  --r-sm: 10px;
+  --r-md: 14px;
+  --r-lg: 18px;
+  --r-xl: 24px;
+  --r-2xl: 30px;
+  --r-full: 999px;
+
+  /* ---------------------------------------------------------------
+     ELEVACIÓN
+     --------------------------------------------------------------- */
+  --sh-xs: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --sh-sm: 0 2px 8px -2px rgba(0, 0, 0, 0.5);
+  --sh-md: 0 8px 24px -8px rgba(0, 0, 0, 0.6);
+  --sh-lg: 0 20px 48px -16px rgba(0, 0, 0, 0.7);
+  --sh-sheet: 0 -16px 48px -12px rgba(0, 0, 0, 0.75);
+  --sh-brand: 0 8px 28px -10px rgba(139, 92, 246, 0.6);
+  --sh-brand-lg: 0 16px 48px -12px rgba(139, 92, 246, 0.5);
+
+  /* ---------------------------------------------------------------
+     MOVIMIENTO
+     --------------------------------------------------------------- */
+  --ease: cubic-bezier(0.32, 0.72, 0, 1);
   --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
-  --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
-  --duration-fast: 120ms;
-  --duration-base: 180ms;
-  --duration-slow: 240ms;
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --t-fast: 130ms;
+  --t-base: 200ms;
+  --t-slow: 320ms;
 
-  /* Layout */
+  /* ---------------------------------------------------------------
+     LAYOUT
+     --------------------------------------------------------------- */
   --frame-w: 390px;
   --frame-h: 844px;
-  --frame-radius: 44px;
-  --frame-bezel: 12px;
-  --topbar-h: 56px;
-  --rail-w: 240px;
-  --queue-w: 340px;
-  --detail-w: 360px;
+  --topbar-h: 60px;
+  --rail-w: 232px;
+  --queue-w: 348px;
+  --detail-w: 372px;
 }
 
-/* ============================================
-   Reset + base
-   ============================================ */
+/* ==========================================================================
+   RESET
+   ========================================================================== */
 
 *,
 *::before,
@@ -112,37 +204,58 @@ html,
 body {
   margin: 0;
   padding: 0;
-  background: var(--bg);
-  color: var(--fg);
-  font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto,
-    'Helvetica Neue', Arial, sans-serif;
-  font-feature-settings: 'cv11', 'ss01', 'ss03';
-  font-size: var(--text-base);
-  line-height: var(--leading-normal);
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-  text-rendering: optimizeLegibility;
-  font-variant-numeric: tabular-nums lining-nums;
-  min-height: 100vh;
+  min-height: 100%;
+}
+
+html {
+  color-scheme: dark;
+  -webkit-text-size-adjust: 100%;
 }
 
 body {
-  overscroll-behavior-y: contain;
+  background: var(--bg);
+  color: var(--fg);
+  font-family: var(--font-sans);
+  font-size: var(--text-md);
+  line-height: 1.5;
+  letter-spacing: var(--tracking-snug);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+  overscroll-behavior-y: none;
+}
+
+h1,
+h2,
+h3,
+h4 {
+  font-family: var(--font-display);
+  font-weight: 700;
+  letter-spacing: var(--tracking-tight);
+  line-height: 1.15;
+  margin: 0;
+}
+
+p {
+  margin: 0;
 }
 
 button {
   font: inherit;
+  letter-spacing: inherit;
   color: inherit;
   background: none;
   border: 0;
   padding: 0;
   cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
 }
 
 input,
 select,
 textarea {
   font: inherit;
+  letter-spacing: inherit;
   color: inherit;
 }
 
@@ -151,30 +264,38 @@ a {
   text-decoration: none;
 }
 
+svg {
+  display: block;
+  flex-shrink: 0;
+}
+
+ul,
+ol {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+table {
+  border-collapse: collapse;
+  width: 100%;
+}
+
+/* ==========================================================================
+   BASE INTERACTIVO
+   ========================================================================== */
+
 ::selection {
-  background: var(--accent-soft-strong);
-  color: var(--fg);
+  background: var(--brand-a40);
+  color: #fff;
 }
 
-/* Focus ring */
 :focus-visible {
-  outline: 2px solid var(--accent);
+  outline: 2px solid var(--brand-400);
   outline-offset: 2px;
-  border-radius: 4px;
+  border-radius: 6px;
 }
 
-/* Tabular numerals for data */
-.num {
-  font-variant-numeric: tabular-nums lining-nums;
-  font-feature-settings: 'tnum', 'lnum';
-}
-
-.mono {
-  font-family: 'JetBrains Mono', 'SF Mono', Menlo, Consolas, monospace;
-  font-variant-numeric: tabular-nums lining-nums;
-}
-
-/* Utility scrollbar */
 ::-webkit-scrollbar {
   width: 10px;
   height: 10px;
@@ -184,14 +305,134 @@ a {
 }
 ::-webkit-scrollbar-thumb {
   background: var(--surface-3);
-  border-radius: 8px;
-  border: 2px solid var(--bg);
+  border: 3px solid transparent;
+  background-clip: content-box;
+  border-radius: 99px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: var(--border);
+  background: var(--surface-4);
+  background-clip: content-box;
 }
 
-/* Reduce motion */
+/* ==========================================================================
+   UTILIDADES
+   ========================================================================== */
+
+.num {
+  font-variant-numeric: tabular-nums lining-nums;
+  font-feature-settings: 'tnum' 1, 'lnum' 1;
+}
+
+.mono {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums lining-nums;
+}
+
+.truncate {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* Etiqueta de sección en versalitas */
+.eyebrow {
+  font-size: var(--text-2xs);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-caps);
+  color: var(--fg-subtle);
+}
+
+/* ==========================================================================
+   ANIMACIONES
+   ========================================================================== */
+
+@keyframes pulse-ring {
+  0% {
+    transform: scale(0.6);
+    opacity: 0.7;
+  }
+  80%,
+  100% {
+    transform: scale(2.2);
+    opacity: 0;
+  }
+}
+
+@keyframes breathe {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.45;
+  }
+}
+
+@keyframes sheet-up {
+  from {
+    transform: translateY(16px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes rise-in {
+  from {
+    transform: translateY(10px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+@keyframes shimmer {
+  from {
+    background-position: -200% 0;
+  }
+  to {
+    background-position: 200% 0;
+  }
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes dash-flow {
+  to {
+    stroke-dashoffset: -24;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

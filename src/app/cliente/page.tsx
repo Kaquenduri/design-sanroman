@@ -1,13 +1,13 @@
 import Link from 'next/link';
 import { ArrowLeft } from 'lucide-react';
 import { PhoneFrame } from '@/components/shared/PhoneFrame';
-import { ConductorApp } from '@/components/conductor/ConductorApp';
+import { ClienteApp } from '@/components/cliente/ClienteApp';
 import { Seal } from '@/components/ui';
 import s from '../preview.module.css';
 
-export const metadata = { title: 'App del conductor · Real San Román' };
+export const metadata = { title: 'App del cliente · Real San Román' };
 
-export default function ConductorPage() {
+export default function ClientePage() {
   return (
     <main className={s.stage}>
       <div className={s.bar}>
@@ -16,19 +16,19 @@ export default function ConductorPage() {
           Superficies
         </Link>
         <div className={s.titleBlock}>
-          <div className={s.title}>App del conductor</div>
-          <div className={s.subtitle}>PWA móvil · agremiado en turno</div>
+          <div className={s.title}>App del cliente</div>
+          <div className={s.subtitle}>PWA móvil · pasajero en la calle</div>
         </div>
         <Seal size={40} compact className={s.seal} />
       </div>
 
-      <PhoneFrame label="App del conductor">
-        <ConductorApp />
+      <PhoneFrame label="App del cliente">
+        <ClienteApp />
       </PhoneFrame>
 
       <p className={s.hint}>
-        Conéctate, simula una propuesta entrante y recorre el viaje completo
-        hasta el cobro en efectivo.
+        Elige un destino y una categoría: el flujo corre solo hasta la
+        verificación de la unidad y el cierre del viaje.
       </p>
     </main>
   );

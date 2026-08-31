@@ -1,134 +1,164 @@
-.stage {
-  min-height: 100vh;
-  display: grid;
-  place-items: center;
-  padding: 32px;
-  background:
-    radial-gradient(1200px 600px at 50% 0%, rgba(37, 99, 235, 0.08), transparent 60%),
-    var(--bg);
-}
-
 .phone {
   position: relative;
   width: var(--frame-w);
   height: var(--frame-h);
+  flex-shrink: 0;
   background: #000;
-  border-radius: var(--frame-radius);
-  padding: var(--frame-bezel);
-  box-shadow:
-    0 0 0 2px #1a1d24,
-    0 32px 80px -24px rgba(0, 0, 0, 0.8),
-    0 12px 32px -12px rgba(0, 0, 0, 0.6);
+  border-radius: 54px;
+  padding: 11px;
+  box-shadow: 0 0 0 2px #2A2438, 0 0 0 5px #100E17,
+    0 48px 90px -30px rgba(0, 0, 0, 0.85), 0 18px 40px -20px rgba(0, 0, 0, 0.6);
+}
+
+/* Botones laterales — el detalle que hace que el marco lea como hardware */
+.phone::before,
+.phone::after {
+  content: '';
+  position: absolute;
+  left: -6px;
+  width: 3px;
+  border-radius: 2px;
+  background: linear-gradient(180deg, #2A2438, #17151F);
+}
+.phone::before {
+  top: 148px;
+  height: 34px;
+}
+.phone::after {
+  top: 200px;
+  height: 60px;
+}
+
+.screen {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  border-radius: 44px;
+  overflow: hidden;
+  background: var(--bg);
   display: flex;
   flex-direction: column;
+  isolation: isolate;
 }
 
-.notch {
+/* Isla dinámica */
+.island {
   position: absolute;
-  top: 6px;
+  top: 11px;
   left: 50%;
   transform: translateX(-50%);
-  width: 110px;
-  height: 26px;
+  width: 108px;
+  height: 30px;
   background: #000;
-  border-radius: 0 0 18px 18px;
-  z-index: 3;
+  border-radius: var(--r-full);
+  z-index: 40;
+  pointer-events: none;
 }
 
-.bezelTop {
-  height: 38px;
+.statusBar {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 52px;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0 24px;
-  position: relative;
-  z-index: 2;
+  padding: 0 30px;
+  z-index: 39;
+  pointer-events: none;
   color: #fff;
-  font-size: 13px;
-  font-weight: 600;
-}
-
-.time {
+  font-size: var(--text-sm);
+  font-weight: 650;
   font-variant-numeric: tabular-nums;
 }
 
 .indicators {
   display: flex;
   align-items: center;
-  gap: 5px;
+  gap: 6px;
 }
 
 .signal,
-.wifi,
-.battery {
+.wifi {
   display: inline-block;
   background: currentColor;
 }
-
 .signal {
-  width: 14px;
-  height: 9px;
-  clip-path: polygon(0 100%, 25% 100%, 25% 60%, 50% 60%, 50% 30%, 75% 30%, 75% 10%, 100% 10%, 100% 0, 0 0);
+  width: 17px;
+  height: 11px;
+  clip-path: polygon(
+    0 100%, 21% 100%, 21% 62%, 0 62%,
+    27% 100%, 48% 100%, 48% 40%, 27% 40%,
+    54% 100%, 75% 100%, 75% 18%, 54% 18%,
+    81% 100%, 100% 100%, 100% 0, 81% 0
+  );
 }
-
 .wifi {
-  width: 13px;
-  height: 9px;
-  clip-path: polygon(50% 0, 100% 35%, 85% 50%, 50% 25%, 15% 50%, 0 35%);
+  width: 16px;
+  height: 11px;
+  clip-path: polygon(50% 100%, 0 38%, 12% 27%, 50% 74%, 88% 27%, 100% 38%);
 }
-
 .battery {
-  width: 22px;
-  height: 10px;
-  border-radius: 2px;
+  width: 25px;
+  height: 12px;
+  border-radius: 3px;
+  border: 1.5px solid currentColor;
   position: relative;
-  background: transparent;
-  border: 1px solid currentColor;
+  opacity: 0.9;
 }
-
 .battery::after {
   content: '';
   position: absolute;
-  top: 1px;
-  left: 1px;
-  bottom: 1px;
-  width: 70%;
+  inset: 1.5px;
+  width: 68%;
   background: currentColor;
   border-radius: 1px;
 }
 
-.screen {
+.content {
   flex: 1;
-  background: var(--bg);
-  border-radius: 28px;
-  overflow: hidden;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
   position: relative;
-  display: flex;
-  flex-direction: column;
 }
 
-.appContent {
-  flex: 1;
-  overflow-y: auto;
-  overflow-x: hidden;
-  scrollbar-width: none;
-  -ms-overflow-style: none;
-  display: flex;
-  flex-direction: column;
-}
-
-.appContent::-webkit-scrollbar {
-  display: none;
-}
-
-.homeIndicator {
+.homeBar {
   position: absolute;
   bottom: 8px;
   left: 50%;
   transform: translateX(-50%);
-  width: 120px;
-  height: 4px;
-  background: rgba(255, 255, 255, 0.45);
-  border-radius: 999px;
-  z-index: 3;
+  width: 134px;
+  height: 5px;
+  background: rgba(255, 255, 255, 0.55);
+  border-radius: var(--r-full);
+  z-index: 38;
+  pointer-events: none;
+}
+
+/* En un teléfono real el marco sobra: la app ocupa la pantalla entera. Y el
+   cromo simulado —isla, hora 9:41, señal, batería, barra de inicio— tiene que
+   desaparecer: sobre la barra de estado real del sistema queda duplicado y
+   además afirma un estado de dispositivo que es falso. */
+@media (max-width: 560px) {
+  .phone {
+    width: 100vw;
+    height: 100dvh;
+    border-radius: 0;
+    padding: 0;
+    box-shadow: none;
+  }
+  .phone::before,
+  .phone::after {
+    display: none;
+  }
+  .screen {
+    border-radius: 0;
+  }
+  .island,
+  .statusBar,
+  .homeBar {
+    display: none;
+  }
 }

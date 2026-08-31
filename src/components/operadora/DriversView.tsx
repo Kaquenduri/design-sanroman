@@ -1,136 +1,168 @@
 'use client';
 
 import { useState } from 'react';
-import { Search, MoreHorizontal, Phone, Plus } from 'lucide-react';
-import styles from './Operadora.module.css';
-import { DRIVERS, UNITS, MEMBERSHIPS, membershipBadge } from '@/data';
+import { Search, MoreHorizontal, UserPlus, Phone } from 'lucide-react';
+import {
+  Avatar,
+  Button,
+  Chip,
+  Field,
+  IconButton,
+  Plate,
+  Stars,
+  Segmented,
+  Empty,
+  Synthetic,
+} from '@/components/ui';
+import {
+  DRIVERS,
+  UNITS,
+  MEMBERSHIPS,
+  membershipBadge,
+  formatDate,
+} from '@/data';
+import s from './Operadora.module.css';
+
+type Filter = 'all' | 'activa' | 'vence-pronto' | 'vencida';
 
 export function DriversView() {
   const [search, setSearch] = useState('');
-  const [filter, setFilter] = useState<'all' | 'activa' | 'vence-pronto' | 'vencida'>('all');
+  const [filter, setFilter] = useState<Filter>('all');
 
-  const filtered = DRIVERS.filter((d) => {
+  const rows = DRIVERS.filter((d) => {
     const m = MEMBERSHIPS.find((x) => x.driverId === d.id)!;
-    const matchesText =
-      d.name.toLowerCase().includes(search.toLowerCase()) ||
-      d.phone.includes(search);
-    const matchesStatus = filter === 'all' || m.status === filter;
-    return matchesText && matchesStatus;
+    const q = search.trim().toLowerCase();
+    const matchText =
+      !q || d.name.toLowerCase().includes(q) || d.phone.includes(q);
+    return matchText && (filter === 'all' || m.status === filter);
   });
 
+  const count = (f: Filter) =>
+    f === 'all'
+      ? DRIVERS.length
+      : MEMBERSHIPS.filter((m) => m.status === f).length;
+
   return (
-    <div className={styles.page}>
-      <div className={styles.pageHeader}>
+    <div className={s.page}>
+      <div className={s.pageHead}>
         <div>
-          <h1 className={styles.pageTitle}>Conductores</h1>
-          <div className={styles.pageSub}>
-            {DRIVERS.length} conductores agremiados · {MEMBERSHIPS.filter((m) => m.status === 'activa').length} con membresía activa
-          </div>
+          <h1 className={s.pageTitle}>Conductores</h1>
+          <p className={s.pageSub}>
+            {DRIVERS.length} agremiados · {count('activa')} habilitados para
+            recibir viajes
+          </p>
         </div>
-        <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
-          <div className={styles.searchInput}>
-            <Search size={14} color="var(--fg-muted)" />
-            <input
-              placeholder="Buscar por nombre o teléfono…"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-            />
-          </div>
-          <button className={styles.actionBtn} style={{ padding: '9px 14px' }}>
-            <Plus size={14} /> Agregar conductor
-          </button>
+        <div className={s.pageTools}>
+          <Field
+            icon={<Search size={16} color="var(--fg-subtle)" />}
+            value={search}
+            onChange={setSearch}
+            placeholder="Buscar por nombre o teléfono…"
+            small
+            className={s.search}
+          />
+          <Button size="md">
+            <UserPlus size={16} />
+            Agregar conductor
+          </Button>
         </div>
       </div>
 
-      <div style={{ display: 'flex', gap: 6 }}>
-        {(['all', 'activa', 'vence-pronto', 'vencida'] as const).map((f) => {
-          const count =
-            f === 'all'
-              ? DRIVERS.length
-              : MEMBERSHIPS.filter((m) => m.status === f).length;
-          return (
-            <button
-              key={f}
-              className={`${styles.chipFilter} ${filter === f ? styles['chipFilter--active'] : ''}`}
-              onClick={() => setFilter(f)}
-              style={{ padding: '6px 12px', fontSize: 12 }}
-            >
-              {f === 'all' ? 'Todos' : membershipBadge({ driverId: '', status: f, expiresOn: '', daysToExpire: 0 }).label}{' '}
-              <span style={{ opacity: 0.6 }}>· {count}</span>
-            </button>
-          );
-        })}
-      </div>
+      <Segmented
+        value={filter}
+        onChange={setFilter}
+        options={[
+          { value: 'all', label: 'Todos', count: count('all') },
+          { value: 'activa', label: 'Vigentes', count: count('activa') },
+          {
+            value: 'vence-pronto',
+            label: 'Por vencer',
+            count: count('vence-pronto'),
+          },
+          { value: 'vencida', label: 'Vencidas', count: count('vencida') },
+        ]}
+      />
 
-      <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)', overflow: 'hidden' }}>
-        <table className={styles.dataTable}>
-          <thead>
-            <tr>
-              <th>Conductor</th>
-              <th>Unidad</th>
-              <th>Teléfono</th>
-              <th>Membresía</th>
-              <th>Hoy</th>
-              <th>Valoración</th>
-              <th style={{ width: 60 }} />
-            </tr>
-          </thead>
-          <tbody>
-            {filtered.map((d) => {
-              const u = UNITS.find((x) => x.driverId === d.id)!;
-              const m = MEMBERSHIPS.find((x) => x.driverId === d.id)!;
-              const badge = membershipBadge(m);
-              return (
-                <tr key={d.id}>
-                  <td>
-                    <div className={styles.cellDriver}>
-                      <div className={styles.avatarSm}>{d.avatarSeed}</div>
-                      <div>
-                        <div style={{ fontWeight: 600 }}>{d.name}</div>
-                        <div style={{ fontSize: 11, color: 'var(--fg-muted)' }}>
-                          Desde {new Date(d.joinedAt).toLocaleDateString('es-PE', { month: 'short', year: 'numeric' })}
+      {rows.length === 0 ? (
+        <Empty icon={<Search size={20} />} title="Sin resultados">
+          Ningún conductor coincide con «{search}». Revisa la ortografía o
+          limpia el filtro.
+        </Empty>
+      ) : (
+        <div className={s.tableWrap}>
+          <table className={s.table}>
+            <thead>
+              <tr>
+                <th>Conductor</th>
+                <th>Unidad</th>
+                <th>Teléfono</th>
+                <th>Membresía</th>
+                <th className={s.right}>Viajes hoy</th>
+                <th>Valoración</th>
+                <th style={{ width: 44 }} />
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((d) => {
+                const u = UNITS.find((x) => x.driverId === d.id)!;
+                const m = MEMBERSHIPS.find((x) => x.driverId === d.id)!;
+                const badge = membershipBadge(m);
+                return (
+                  <tr key={d.id}>
+                    <td>
+                      <div className={s.cellPerson}>
+                        <Avatar initials={d.avatarSeed} size={32} />
+                        <div>
+                          <div className={s.cellName}>{d.name}</div>
+                          <div className={s.cellMeta}>
+                            Agremiado desde {formatDate(d.joinedAt)}
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  </td>
-                  <td>
-                    <span className={styles.placa}>{u.placa}</span>
-                    <span style={{ fontSize: 11, color: 'var(--fg-muted)', marginLeft: 8 }}>
-                      #{u.id.replace('u', '')}
-                    </span>
-                  </td>
-                  <td className={styles.mono} style={{ fontSize: 12 }}>
-                    {d.phone}
-                  </td>
-                  <td>
-                    <span className={`${styles.pill} ${styles[`pill--${badge.color}`]}`}>
-                      {badge.label}
-                    </span>
-                    <div style={{ fontSize: 11, color: 'var(--fg-muted)', marginTop: 4 }}>
-                      {new Date(m.expiresOn).toLocaleDateString('es-PE', {
-                        day: '2-digit',
-                        month: 'short',
-                        year: 'numeric',
-                      })}
-                    </div>
-                  </td>
-                  <td className={styles.mono} style={{ fontWeight: 600 }}>
-                    {d.tripsToday}
-                  </td>
-                  <td className={styles.mono}>
-                    <span style={{ color: 'var(--taxi)' }}>★</span> {d.rating.toFixed(1)}
-                  </td>
-                  <td>
-                    <button className={styles.actionBtn} aria-label="Más opciones">
-                      <MoreHorizontal size={14} />
-                    </button>
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
+                    </td>
+                    <td>
+                      <div className={s.cellPerson}>
+                        <Plate value={u.placa} />
+                        <span className={s.cellMeta}>Unidad {u.n}</span>
+                      </div>
+                    </td>
+                    <td className="mono" style={{ fontSize: 'var(--text-sm)' }}>
+                      {d.phone}
+                    </td>
+                    <td>
+                      <Chip tone={badge.tone} dot>
+                        {badge.label}
+                      </Chip>
+                      <div className={s.cellMeta} style={{ marginTop: 4 }}>
+                        {formatDate(m.expiresOn)}
+                      </div>
+                    </td>
+                    <td className={`${s.right} num`} style={{ fontWeight: 650 }}>
+                      {d.tripsToday}
+                    </td>
+                    <td>
+                      <Stars value={d.rating} />
+                    </td>
+                    <td>
+                      <IconButton
+                        variant="ghost"
+                        size="sm"
+                        aria-label={`Acciones de ${d.name}`}
+                      >
+                        <MoreHorizontal size={16} />
+                      </IconButton>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      <Synthetic>
+        Datos sintéticos de demostración · ningún conductor real
+      </Synthetic>
     </div>
   );
 }

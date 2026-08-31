@@ -1,93 +1,111 @@
 import Link from 'next/link';
-import { ArrowRight, Smartphone, MapPin, Users } from 'lucide-react';
-import styles from './page.module.css';
+import { ArrowRight, Smartphone, MapPin, Radio, Info } from 'lucide-react';
+import { Seal } from '@/components/ui';
+import s from './page.module.css';
+
+const SURFACES = [
+  {
+    href: '/conductor',
+    kind: 'PWA móvil',
+    icon: Smartphone,
+    title: 'App del conductor',
+    text: 'Para el agremiado en turno: conectarse, aceptar la propuesta en 22 segundos y cerrar el viaje cobrando en efectivo.',
+    items: [
+      'Propuesta con cuenta atrás y tarifa fija de anillo',
+      'Cronómetro de embarque de 2 min por ordenanza municipal',
+      'Membresía gremial como habilitación visible',
+    ],
+  },
+  {
+    href: '/cliente',
+    kind: 'PWA móvil',
+    icon: MapPin,
+    title: 'App del cliente',
+    text: 'Para quien espera en la esquina: destino, categoría y precio exacto antes de solicitar, sin regateo ni sorpresas.',
+    items: [
+      'Cuatro categorías con precio y capacidad reales',
+      'Verificación de unidad con el sello del gremio',
+      'Cascada de propuestas visible mientras busca',
+    ],
+  },
+  {
+    href: '/operadora',
+    kind: 'Web escritorio',
+    icon: Radio,
+    title: 'Panel de la operadora',
+    text: 'Para la central: cola en vivo, flota sobre el mapa con anillos tarifarios y asignación manual cuando la cascada se agota.',
+    items: [
+      'Cola de solicitudes por canal: app y teléfono',
+      'Unidad más cercana sugerida sobre el mapa',
+      'Conductores, unidades, membresías y reportes',
+    ],
+  },
+];
 
 export default function Home() {
   return (
-    <main className={styles.landing}>
-      <header className={styles.header}>
-        <div className={styles.brand}>
-          <div className={styles.brandMark} aria-hidden>
-            <span className={styles.brandDot} />
+    <main className={s.page}>
+      <div className={s.inner}>
+        <header className={s.brand}>
+          <Seal size={44} compact className={s.brandSeal} />
+          <div className={s.brandText}>
+            <span className={s.brandName}>Taxi Real San Román</span>
+            <span className={s.brandMeta}>Gremial 32-2020 · Juliaca, Puno</span>
           </div>
-          <div>
-            <div className={styles.brandName}>Taxi Real San Román</div>
-            <div className={styles.brandMeta}>
-              Gremial 32-2020 · Juliaca, Puno
-            </div>
-          </div>
+          <span className={s.tag}>Maqueta de front-end</span>
+        </header>
+
+        <div className={s.hero}>
+          <h1 className={s.headline}>Despacho digital del gremio</h1>
         </div>
-        <div className={styles.tag}>MVP visual · Mock frontend</div>
-      </header>
-
-      <section className={styles.hero}>
-        <h1>
-          Despacho digital
-          <br />
-          <span className={styles.accent}>sin operadora.</span>
-        </h1>
-        <p className={styles.lede}>
-          Vista previa de las dos superficies operativas del MVP: la app del
-          conductor y el panel de la operadora. Todo el contenido es sintético
-          y se ejecuta 100% en el navegador.
+        <p className={s.lede}>
+          Tres superficies del mismo sistema: el conductor en la calle, el
+          pasajero en la esquina y la central que supervisa. Tarifa fija por
+          anillo, pago en efectivo y la membresía gremial como llave de acceso.
         </p>
-      </section>
 
-      <section className={styles.cards}>
-        <Link href="/conductor" className={styles.surfaceCard}>
-          <div className={styles.cardHead}>
-            <span className={styles.cardIcon}>
-              <Smartphone size={22} strokeWidth={1.5} />
-            </span>
-            <span className={styles.chip}>PWA mobile</span>
-          </div>
-          <h2>App del Conductor</h2>
-          <p>
-            Login con membresía, online/offline, recibir viaje, navegar al
-            pasajero, finalizar viaje y resumen del día. Diseñada para mirada
-            rápida bajo sol altiplánico.
-          </p>
-          <ul className={styles.cardList}>
-            <li>Estados grandes con icono + texto</li>
-            <li>Acciones a un toque, pulgar-friendly</li>
-            <li>Mapa mockeado · datos sintéticos</li>
-          </ul>
-          <span className={styles.cta}>
-            Abrir app <ArrowRight size={16} strokeWidth={2} />
+        <div className={s.grid}>
+          {SURFACES.map((sf) => {
+            const Icon = sf.icon;
+            return (
+              <Link key={sf.href} href={sf.href} className={s.card}>
+                <div className={s.cardTop}>
+                  <span className={s.cardIcon}>
+                    <Icon size={22} strokeWidth={1.9} />
+                  </span>
+                  <span className={s.cardKind}>{sf.kind}</span>
+                </div>
+
+                <h2 className={s.cardTitle}>{sf.title}</h2>
+                <p className={s.cardText}>{sf.text}</p>
+
+                <div className={s.cardList}>
+                  {sf.items.map((it) => (
+                    <span key={it} className={s.cardItem}>
+                      <span className={s.bullet} aria-hidden />
+                      {it}
+                    </span>
+                  ))}
+                </div>
+
+                <span className={s.cardCta}>
+                  Abrir
+                  <ArrowRight size={18} />
+                </span>
+              </Link>
+            );
+          })}
+        </div>
+
+        <footer className={s.foot}>
+          <Info size={16} />
+          <span>
+            Todo el contenido es sintético y corre en el navegador: sin backend,
+            sin GPS y sin mapas reales. Nombres, placas, tarifas y cifras son
+            ilustrativos.
           </span>
-        </Link>
-
-        <Link href="/operadora" className={styles.surfaceCard}>
-          <div className={styles.cardHead}>
-            <span className={styles.cardIcon}>
-              <MapPin size={22} strokeWidth={1.5} />
-            </span>
-            <span className={styles.chip}>Web admin</span>
-          </div>
-          <h2>Panel de la Operadora</h2>
-          <p>
-            Vista de despacho en tiempo real con mapa, cola de solicitudes,
-            asignación manual, gestión de conductores, unidades, membresías y
-            reportes del día.
-          </p>
-          <ul className={styles.cardList}>
-            <li>Mapa de Juliaca con ~25 unidades simuladas</li>
-            <li>Cola de solicitudes + asignación</li>
-            <li>Conductores, unidades, reportes</li>
-          </ul>
-          <span className={styles.cta}>
-            Abrir panel <ArrowRight size={16} strokeWidth={2} />
-          </span>
-        </Link>
-      </section>
-
-      <footer className={styles.footer}>
-        <Users size={14} strokeWidth={1.5} />
-        <span>
-          Vista previa de mockup. Sin backend, sin maps reales, sin datos
-          productivos.
-        </span>
-      </footer>
+        </footer>
+      </div>
     </main>
   );
 }

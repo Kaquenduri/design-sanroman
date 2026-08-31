@@ -2,121 +2,158 @@
 
 import { useState } from 'react';
 import { Search, MoreHorizontal } from 'lucide-react';
-import styles from './Operadora.module.css';
-import { UNITS, DRIVERS, statusLabel, statusColor, type Unit } from '@/data';
+import {
+  Avatar,
+  Chip,
+  Field,
+  IconButton,
+  Plate,
+  UnitBadge,
+  Segmented,
+  Empty,
+  Synthetic,
+} from '@/components/ui';
+import {
+  UNITS,
+  DRIVERS,
+  CATEGORY_BY_ID,
+  statusLabel,
+  statusTone,
+  formatTime,
+  type UnitStatus,
+} from '@/data';
+import s from './Operadora.module.css';
+
+type Filter = 'all' | UnitStatus;
 
 export function UnitsView() {
   const [search, setSearch] = useState('');
-  const [filter, setFilter] = useState<'all' | Unit['status']>('all');
+  const [filter, setFilter] = useState<Filter>('all');
 
-  const filtered = UNITS.filter((u) => {
+  const rows = UNITS.filter((u) => {
     const d = DRIVERS.find((x) => x.id === u.driverId);
-    const matchesText =
-      u.placa.toLowerCase().includes(search.toLowerCase()) ||
-      (d && d.name.toLowerCase().includes(search.toLowerCase()));
-    const matchesStatus = filter === 'all' || u.status === filter;
-    return matchesText && matchesStatus;
+    const q = search.trim().toLowerCase();
+    const matchText =
+      !q ||
+      u.placa.toLowerCase().includes(q) ||
+      u.n.includes(q) ||
+      (d?.name.toLowerCase().includes(q) ?? false);
+    return matchText && (filter === 'all' || u.status === filter);
   });
 
+  const count = (f: Filter) =>
+    f === 'all' ? UNITS.length : UNITS.filter((u) => u.status === f).length;
+
   return (
-    <div className={styles.page}>
-      <div className={styles.pageHeader}>
+    <div className={s.page}>
+      <div className={s.pageHead}>
         <div>
-          <h1 className={styles.pageTitle}>Unidades</h1>
-          <div className={styles.pageSub}>
-            {UNITS.length} unidades operativas · {UNITS.filter((u) => u.status === 'active').length} disponibles
-          </div>
+          <h1 className={s.pageTitle}>Unidades</h1>
+          <p className={s.pageSub}>
+            {UNITS.length} unidades registradas · {count('active')} disponibles
+            ahora
+          </p>
         </div>
-        <div className={styles.searchInput}>
-          <Search size={14} color="var(--fg-muted)" />
-          <input
-            placeholder="Buscar por placa o conductor…"
+        <div className={s.pageTools}>
+          <Field
+            icon={<Search size={16} color="var(--fg-subtle)" />}
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            onChange={setSearch}
+            placeholder="Buscar placa, número o conductor…"
+            small
+            className={s.search}
           />
         </div>
       </div>
 
-      <div style={{ display: 'flex', gap: 6 }}>
-        {(['all', 'active', 'on-trip', 'offline', 'blocked'] as const).map((f) => {
-          const count = f === 'all' ? UNITS.length : UNITS.filter((u) => u.status === f).length;
-          return (
-            <button
-              key={f}
-              className={`${styles.chipFilter} ${filter === f ? styles['chipFilter--active'] : ''}`}
-              onClick={() => setFilter(f)}
-              style={{ padding: '6px 12px', fontSize: 12 }}
-            >
-              {f === 'all' ? 'Todas' : statusLabel(f)}{' '}
-              <span style={{ opacity: 0.6 }}>· {count}</span>
-            </button>
-          );
-        })}
-      </div>
+      <Segmented
+        value={filter}
+        onChange={setFilter}
+        options={[
+          { value: 'all', label: 'Todas', count: count('all') },
+          { value: 'active', label: 'Disponibles', count: count('active') },
+          { value: 'on-trip', label: 'En viaje', count: count('on-trip') },
+          { value: 'offline', label: 'Sin conexión', count: count('offline') },
+          { value: 'blocked', label: 'Bloqueadas', count: count('blocked') },
+        ]}
+      />
 
-      <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)', overflow: 'hidden' }}>
-        <table className={styles.dataTable}>
-          <thead>
-            <tr>
-              <th>Unidad</th>
-              <th>Placa</th>
-              <th>Vehículo</th>
-              <th>Conductor</th>
-              <th>Estado</th>
-              <th>Última conexión</th>
-              <th style={{ width: 60 }} />
-            </tr>
-          </thead>
-          <tbody>
-            {filtered.map((u) => {
-              const d = DRIVERS.find((x) => x.id === u.driverId);
-              const color = statusColor(u.status);
-              return (
-                <tr key={u.id}>
-                  <td className={styles.mono} style={{ fontWeight: 700 }}>
-                    #{u.id.replace('u', '')}
-                  </td>
-                  <td>
-                    <span className={styles.placa}>{u.placa}</span>
-                  </td>
-                  <td style={{ fontSize: 13 }}>
-                    {u.marca} {u.modelo} <span style={{ color: 'var(--fg-muted)' }}>{u.anio}</span>
-                  </td>
-                  <td>
-                    {d ? (
-                      <div className={styles.cellDriver}>
-                        <div className={styles.avatarSm}>{d.avatarSeed}</div>
-                        <div style={{ fontWeight: 500 }}>{d.name}</div>
-                      </div>
-                    ) : (
-                      <span style={{ color: 'var(--fg-muted)', fontStyle: 'italic' }}>
-                        Sin asignar
+      {rows.length === 0 ? (
+        <Empty icon={<Search size={20} />} title="Sin resultados">
+          Ninguna unidad coincide con «{search}».
+        </Empty>
+      ) : (
+        <div className={s.tableWrap}>
+          <table className={s.table}>
+            <thead>
+              <tr>
+                <th>Unidad</th>
+                <th>Placa</th>
+                <th>Vehículo</th>
+                <th>Categoría</th>
+                <th>Conductor</th>
+                <th>Estado</th>
+                <th>Última señal</th>
+                <th style={{ width: 44 }} />
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((u) => {
+                const d = DRIVERS.find((x) => x.id === u.driverId);
+                const cat = CATEGORY_BY_ID[u.categoryId];
+                return (
+                  <tr key={u.id}>
+                    <td>
+                      <UnitBadge n={u.n} size="sm" />
+                    </td>
+                    <td>
+                      <Plate value={u.placa} />
+                    </td>
+                    <td>
+                      {u.marca} {u.modelo}{' '}
+                      <span className={s.cellMeta} style={{ display: 'inline' }}>
+                        {u.anio}
                       </span>
-                    )}
-                  </td>
-                  <td>
-                    <span className={`${styles.pill} ${styles[`pill--${color}`]}`}>
-                      {statusLabel(u.status)}
-                    </span>
-                  </td>
-                  <td className={styles.mono} style={{ fontSize: 12, color: 'var(--fg-muted)' }}>
-                    {new Date(u.lastSeenAt).toLocaleTimeString('es-PE', {
-                      hour: '2-digit',
-                      minute: '2-digit',
-                      hour12: true,
-                    })}
-                  </td>
-                  <td>
-                    <button className={styles.actionBtn} aria-label="Más opciones">
-                      <MoreHorizontal size={14} />
-                    </button>
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
+                    </td>
+                    <td>
+                      <Chip tone="neutral">{cat.label}</Chip>
+                    </td>
+                    <td>
+                      {d ? (
+                        <div className={s.cellPerson}>
+                          <Avatar initials={d.avatarSeed} size={28} />
+                          <span>{d.name}</span>
+                        </div>
+                      ) : (
+                        <span className={s.cellMeta}>Sin asignar</span>
+                      )}
+                    </td>
+                    <td>
+                      <Chip tone={statusTone(u.status)} dot>
+                        {statusLabel(u.status)}
+                      </Chip>
+                    </td>
+                    <td className="mono" style={{ fontSize: 'var(--text-sm)' }}>
+                      {formatTime(u.lastSeenAt)}
+                    </td>
+                    <td>
+                      <IconButton
+                        variant="ghost"
+                        size="sm"
+                        aria-label={`Acciones de la unidad ${u.n}`}
+                      >
+                        <MoreHorizontal size={16} />
+                      </IconButton>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      <Synthetic>Datos sintéticos de demostración</Synthetic>
     </div>
   );
 }
