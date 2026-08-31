@@ -11,6 +11,10 @@ import {
   Star,
   ChevronRight,
   Zap,
+  MapPin,
+  Clock3,
+  CarFront,
+  ShieldCheck,
 } from 'lucide-react';
 import {
   Button,
@@ -24,6 +28,7 @@ import {
   Seal,
   UnitBadge,
   CountdownRing,
+  Plate,
 } from '@/components/ui';
 import {
   DRIVERS,
@@ -56,24 +61,34 @@ const TRIPS_TODAY = TODAY_TRIPS.length;
 export function SheetOffline({ onGoOnline }: { onGoOnline: () => void }) {
   const badge = membershipBadge(MEMBERSHIP);
   return (
-    <Sheet>
-      <div className={c.head}>
-        <Avatar initials={DRIVER.avatarSeed} size={48} />
-        <div className={c.headText}>
-          <div className={c.title}>{DRIVER.name.split(' ')[0]}, buen día</div>
-          <div className={c.subtitle}>
-            {UNIT.marca} {UNIT.modelo} · {UNIT.anio}
+    <Sheet className={c.homeSheet}>
+      <div className={c.identityHero}>
+        <Seal size={72} className={c.identitySeal} />
+        <div className={c.identityTop}>
+          <Avatar initials={DRIVER.avatarSeed} size={50} ring />
+          <div className={c.headText}>
+            <div className={c.eyebrow}>Conductor en turno</div>
+            <div className={c.identityName}>
+              {DRIVER.name.split(' ')[0]}, buen día
+            </div>
+            <div className={c.identityVehicle}>
+              {UNIT.marca} {UNIT.modelo} · {UNIT.anio}
+            </div>
           </div>
+          <UnitBadge n={UNIT.n} size="lg" />
         </div>
-        <UnitBadge n={UNIT.n} size="md" />
+        <div className={c.identityFoot}>
+          <Plate value={UNIT.placa} />
+          <span>Juliaca · turno de mañana</span>
+        </div>
       </div>
 
       <div className={c.verify}>
-        <Seal size={30} compact className={c.verifySeal} />
+        <ShieldCheck size={22} className={c.verifySeal} />
         <div className={c.verifyBody}>
-          <div className={c.verifyTitle}>Membresía gremial {badge.label.toLowerCase()}</div>
+          <div className={c.verifyTitle}>Habilitación {badge.label.toLowerCase()}</div>
           <div className={c.verifyMeta}>
-            Habilitado para recibir viajes · vence en {MEMBERSHIP.daysToExpire} días
+            Puedes recibir viajes · vence en {MEMBERSHIP.daysToExpire} días
           </div>
         </div>
         <Chip tone="success" dot>
@@ -101,8 +116,9 @@ export function SheetOffline({ onGoOnline }: { onGoOnline: () => void }) {
       <div className={c.actions}>
         <Button size="xl" full onClick={onGoOnline}>
           <Power size={21} strokeWidth={2.4} />
-          Conectarme
+          Empezar a recibir viajes
         </Button>
+        <div className={c.actionHint}>Tu ubicación se compartirá con la central</div>
       </div>
     </Sheet>
   );
@@ -118,8 +134,8 @@ export function SheetOnline({
   onSimulate: () => void;
 }) {
   return (
-    <Sheet>
-      <div className={c.waiting}>
+    <Sheet className={c.onlineSheet}>
+      <div className={c.availabilityCard}>
         <span className={c.radar} aria-hidden>
           <span />
           <span />
@@ -127,11 +143,15 @@ export function SheetOnline({
           <span className={c.radarCore} />
         </span>
         <div className={c.headText}>
-          <div className={c.title}>Buscando viajes</div>
-          <div className={c.subtitle}>
-            Estás en el pool de asignación del gremio
+          <div className={c.eyebrow}>Estado de la unidad</div>
+          <div className={c.availabilityTitle}>Disponible</div>
+          <div className={c.availabilityMeta}>
+            Buscando solicitudes cerca de ti
           </div>
         </div>
+        <span className={c.liveSwitch} aria-label="Disponible">
+          <span />
+        </span>
       </div>
 
       <div className={`${c.metrics} ${c.metricsBoxed}`}>
@@ -154,7 +174,7 @@ export function SheetOnline({
       <div className={c.actions}>
         <Button size="lg" variant="outline" full onClick={onGoOffline}>
           <Power size={18} />
-          Desconectarme
+          Dejar de recibir viajes
         </Button>
         <Button size="md" variant="ghost" full onClick={onSimulate}>
           <Zap size={15} />
@@ -184,12 +204,13 @@ export function SheetProposal({
 }) {
   const urgent = secondsLeft <= 7;
   return (
-    <Sheet grabber={false}>
-      <div className={c.head}>
+    <Sheet grabber={false} className={c.proposalSheet}>
+      <div className={c.proposalHead}>
         <div className={c.headText}>
-          <div className={c.title}>Te toca esta carrera</div>
+          <div className={c.eyebrow}>Nueva propuesta</div>
+          <div className={c.title}>Una carrera para ti</div>
           <div className={c.subtitle}>
-            Eres la unidad más cercana disponible
+            Eres la unidad disponible más cercana
           </div>
         </div>
         <CountdownRing
@@ -200,20 +221,19 @@ export function SheetProposal({
         />
       </div>
 
-      <div className={c.fare}>
-        <span className={c.fareAmount}>{formatPEN(fare)}</span>
-        <span className={c.fareMeta}>
-          {CATEGORY.label} · {REQUEST.distanceKm.toFixed(1)} km
-          <br />3 min hasta el pasajero
-        </span>
+      <div className={c.fareHero}>
+        <div>
+          <span className={c.fareLabel}>Cobrarás en efectivo</span>
+          <span className={c.fareAmount}>{formatPEN(fare)}</span>
+        </div>
+        <div className={c.fareFacts}>
+          <span>{CATEGORY.label}</span>
+          <span>{REQUEST.distanceKm.toFixed(1)} km</span>
+          <span>Recojo en 3 min</span>
+        </div>
       </div>
 
-      <div className={c.cashNote}>
-        <Banknote size={14} />
-        Cobro en efectivo · tarifa fija de anillo, sin regateo
-      </div>
-
-      <div className={c.metrics}>
+      <div className={c.routeCard}>
         <Legs
           from={REQUEST.pickupAddress}
           fromMeta="a 0.8 km de tu posición"
@@ -221,7 +241,7 @@ export function SheetProposal({
         />
       </div>
 
-      <div className={c.person}>
+      <div className={`${c.person} ${c.personCard}`}>
         <Avatar initials={REQUEST.passengerSeed} size={40} />
         <div className={c.personBody}>
           <div className={c.personName}>{REQUEST.passengerName}</div>
@@ -229,6 +249,7 @@ export function SheetProposal({
             <Stars value={REQUEST.passengerRating} count={23} />
           </div>
         </div>
+        <Banknote size={18} className={c.personTrailing} />
       </div>
 
       <div className={`${c.actions} ${c.actionsPair}`}>
@@ -277,17 +298,23 @@ export function SheetPickup({
   onArrived: () => void;
 }) {
   return (
-    <Sheet>
-      <div className={c.head}>
-        <div className={c.headText}>
-          <div className={c.title}>
-            Llegas en {Math.max(1, Math.ceil(etaSeconds / 60))} min
-          </div>
-          <div className={c.subtitle}>{REQUEST.pickupAddress}</div>
+    <Sheet className={c.pickupSheet}>
+      <div className={c.etaHero}>
+        <div className={c.etaNumber}>
+          {Math.max(1, Math.ceil(etaSeconds / 60))}
+          <span>min</span>
         </div>
+        <div className={c.etaBody}>
+          <span className={c.eyebrow}>Hasta el recojo</span>
+          <strong>{REQUEST.pickupAddress}</strong>
+          <span>Continúa por la ruta marcada</span>
+        </div>
+        <Navigation size={24} className={c.etaIcon} />
       </div>
 
-      <PassengerRow />
+      <div className={c.personCard}>
+        <PassengerRow />
+      </div>
 
       <div className={c.actions}>
         <Button size="xl" full onClick={onArrived}>
@@ -309,7 +336,7 @@ export function SheetArrived({
   onStart: () => void;
 }) {
   return (
-    <Sheet>
+    <Sheet className={c.arrivedSheet}>
       <div className={c.head}>
         <div className={c.headText}>
           <div className={c.title}>
@@ -321,6 +348,7 @@ export function SheetArrived({
 
       {/* La ordenanza municipal limita el embarque a 2 min en vías saturadas */}
       <div className={c.boarding}>
+        <Clock3 size={24} className={c.boardingIcon} />
         <div className={c.boardingBody}>
           <div className={c.boardingTitle}>Tiempo de embarque</div>
           <div className={c.boardingMeta}>
@@ -330,7 +358,7 @@ export function SheetArrived({
         <span className={c.boardingClock}>{formatClock(boardingLeft)}</span>
       </div>
 
-      <div style={{ marginTop: 'var(--s-4)' }}>
+      <div className={c.arrivedPassenger}>
         <PassengerRow />
       </div>
 
@@ -356,15 +384,24 @@ export function SheetTrip({
   onFinish: () => void;
 }) {
   return (
-    <Sheet>
+    <Sheet className={c.tripSheet}>
       <div className={c.head}>
         <div className={c.headText}>
           <div className={c.subtitle}>Llevas a {REQUEST.passengerName} a</div>
           <div className={c.title}>{REQUEST.destinationAddress}</div>
         </div>
-        <Chip tone="brand" dot live large>
+        <Chip tone="brand" dot live large className={c.tripClock}>
           {formatClock(elapsed)}
         </Chip>
+      </div>
+
+      <div className={c.tripRouteCard}>
+        <MapPin size={21} />
+        <div>
+          <span>Destino</span>
+          <strong>{REQUEST.destinationAddress}</strong>
+          <small>Pasajera: {REQUEST.passengerName}</small>
+        </div>
       </div>
 
       <div className={`${c.metrics} ${c.metricsBoxed}`}>
@@ -410,12 +447,12 @@ export function SheetFinished({
   onNext: () => void;
 }) {
   return (
-    <Sheet>
+    <Sheet className={c.finishedSheet}>
       <div className={c.done}>
         <span className={c.doneMark}>
           <Check size={32} strokeWidth={3} />
         </span>
-        <span className={c.doneLabel}>Cobra en efectivo</span>
+        <span className={c.doneLabel}>Viaje completado · cobra en efectivo</span>
         <span className={c.doneAmount}>{formatPEN(fare)}</span>
       </div>
 
@@ -430,6 +467,11 @@ export function SheetFinished({
           <span>Total</span>
           <span className={c.breakdownValue}>{formatPEN(fare)}</span>
         </div>
+      </div>
+
+      <div className={c.finishedMeta}>
+        <CarFront size={18} />
+        Unidad {UNIT.n} · tarifa fija confirmada
       </div>
 
       <div className={c.sectionLabel}>Califica a tu pasajero</div>

@@ -247,14 +247,7 @@ export function ConductorApp() {
       <TopChrome>
         {screen === 'offline' && (
           <StatusPill>
-            <span
-              style={{
-                width: 8,
-                height: 8,
-                borderRadius: 99,
-                background: 'var(--fg-subtle)',
-              }}
-            />
+            <span className={c.statusDot} />
             Sin conexión
           </StatusPill>
         )}
@@ -348,7 +341,7 @@ export function ConductorApp() {
 
       {showTabs && tab === 'ganancias' && (
         <Panel title="Ganancias de hoy" onBack={() => setTab('inicio')}>
-          <Card brand>
+          <Card brand className={c.earningsHero}>
             <Stat
               label="Total cobrado"
               value={formatPEN(TODAY_TRIPS.reduce((a, t) => a + t.fare, 0))}
@@ -358,7 +351,7 @@ export function ConductorApp() {
           </Card>
 
           <Card>
-            <div className={c.metrics} style={{ padding: 0 }}>
+            <div className={`${c.metrics} ${c.metricsFlush}`}>
               <Stat
                 className={c.metricDivided}
                 label="Promedio"
@@ -378,7 +371,7 @@ export function ConductorApp() {
           </Card>
 
           <div className={c.sectionLabel}>Viajes completados</div>
-          <Card pad={false} style={{ padding: '0 var(--s-4)' }}>
+          <Card pad={false} className={c.listCard}>
             {TODAY_TRIPS.map((t) => (
               <div key={t.id} className={c.tripRow}>
                 <span className={c.tripTime}>{t.startedAt}</span>
@@ -399,11 +392,11 @@ export function ConductorApp() {
 
       {showTabs && tab === 'perfil' && (
         <Panel title="Mi perfil" onBack={() => setTab('inicio')}>
-          <Card>
+          <Card className={c.profileHero}>
             <div className={c.person}>
               <Avatar initials={DRIVER.avatarSeed} size={56} ring />
               <div className={c.personBody}>
-                <div className={c.personName} style={{ fontSize: 17 }}>
+                <div className={`${c.personName} ${c.personNameLarge}`}>
                   {DRIVER.name}
                 </div>
                 <div className={c.personMeta}>
@@ -415,14 +408,14 @@ export function ConductorApp() {
           </Card>
 
           <div className={c.sectionLabel}>Unidad asignada</div>
-          <Card>
+          <Card className={c.unitProfileCard}>
             <div className={c.person}>
               <UnitBadge n={UNIT.n} size="lg" />
               <div className={c.personBody}>
                 <div className={c.personName}>
                   {UNIT.marca} {UNIT.modelo} {UNIT.anio}
                 </div>
-                <div className={c.personMeta} style={{ marginTop: 6 }}>
+                <div className={`${c.personMeta} ${c.personMetaSpaced}`}>
                   <Plate value={UNIT.placa} />
                   <Chip tone="brand">{CATEGORY.label}</Chip>
                 </div>
@@ -444,7 +437,7 @@ export function ConductorApp() {
             </Chip>
           </div>
 
-          <Card pad={false} style={{ padding: '0 var(--s-4)' }}>
+          <Card pad={false} className={c.listCard}>
             <div className={c.rows}>
               <div className={c.row}>
                 <Phone size={19} className={c.rowIcon} />
