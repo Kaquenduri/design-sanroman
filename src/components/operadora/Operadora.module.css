@@ -12,6 +12,7 @@
   background: var(--bg);
   color: var(--fg);
   overflow: hidden;
+  position: relative;
 }
 
 .body {
@@ -156,16 +157,19 @@
 
 /* ------------------------------------------------------- Dock inferior --- */
 
-/* La franja reserva su propia altura: el dock parece flotar como en Apple,
-   pero nunca se superpone a la leyenda ni a las herramientas del mapa. */
+/* El dockArea ya no es una franja sólida que reserva altura: es un contenedor
+   invisible y absoluto que sólo ancla al dock como isla flotante sobre el
+   mapa. La franja opaca de antes leía como sección separada y rompía la
+   regla §5.1 ("el mapa es el suelo permanente"). */
 .dockArea {
-  height: 82px;
-  flex-shrink: 0;
-  display: grid;
-  place-items: center;
-  padding: var(--s-2) var(--s-5) var(--s-3);
-  background: var(--surface);
-  box-shadow: inset 0 1px 0 var(--border);
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 18px;
+  z-index: 3;
+  display: flex;
+  justify-content: center;
+  pointer-events: none;
 }
 
 .dock {
@@ -177,9 +181,10 @@
   height: 62px;
   padding: var(--s-1) var(--s-2);
   border-radius: var(--r-2xl);
-  background: var(--glass);
+  background: rgba(16, 14, 23, 0.55);
   backdrop-filter: blur(24px) saturate(1.45);
   box-shadow: inset 0 0 0 1px var(--glass-border), var(--sh-lg);
+  pointer-events: auto;
 }
 
 .dockItem {
@@ -513,7 +518,7 @@
 .mapLegend {
   position: absolute;
   left: var(--s-3);
-  bottom: var(--s-3);
+  bottom: 96px;
   z-index: 2;
   display: flex;
   gap: var(--s-4);
