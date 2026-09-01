@@ -21,21 +21,32 @@ export type ConductorScreen =
   | 'summary'
   | 'profile';
 
+export type DriverStatus = 'online' | 'offline' | 'break';
+
 export function ConductorHome() {
   const [screen, setScreen] = useState<ConductorScreen>('home-offline');
-  const [online, setOnline] = useState(false);
+  const [driverStatus, setDriverStatus] = useState<DriverStatus>('offline');
 
   const goOnline = () => {
-    setOnline(true);
+    setDriverStatus('online');
     setScreen('home-online');
   };
 
   const goOffline = () => {
-    setOnline(false);
+    setDriverStatus('offline');
     setScreen('home-offline');
   };
 
-  const receiveRequest = () => setScreen('incoming');
+  const goBreak = () => {
+    setDriverStatus('break');
+    setScreen('home-online');
+  };
+
+  const receiveRequest = () => {
+    if (driverStatus === 'online') {
+      setScreen('incoming');
+    }
+  };
 
   const acceptRequest = () => setScreen('heading');
 
@@ -43,18 +54,40 @@ export function ConductorHome() {
 
   const finishTrip = () => setScreen('finished');
 
-  const backToOnline = () => setScreen('home-online');
+  const backToOnline = () => {
+    setDriverStatus('online');
+    setScreen('home-online');
+  };
 
   return (
     <div className={styles.app} data-screen={screen}>
+      {driverStatus === 'break' && screen === 'home-online' && (
+        <div className={styles.breakOverlay}>
+          <div className={styles.breakOverlayIcon}>☕</div>
+          <div className={styles.breakOverlayText}>En hora de descanso</div>
+        </div>
+      )}
       {screen === 'home-offline' && (
-        <HomeOffline onGoOnline={goOnline} onProfile={() => setScreen('profile')} onSummary={() => setScreen('summary')} />
+        <HomeOffline
+          onGoOnline={goOnline}
+          onGoBreak={goBreak}
+          driverStatus={driverStatus}
+          onProfile={() => setScreen('profile')}
+          onSummary={() => setScreen('summary')}
+        />
       )}
       {screen === 'home-online' && (
-        <HomeOnline onGoOffline={goOffline} onProfile={() => setScreen('profile')} onSummary={() => setScreen('summary')} onSimulate={receiveRequest} />
+        <HomeOnline
+          onGoOffline={goOffline}
+          onGoBreak={goBreak}
+          driverStatus={driverStatus}
+          onProfile={() => setScreen('profile')}
+          onSummary={() => setScreen('summary')}
+          onSimulate={receiveRequest}
+        />
       )}
       {screen === 'incoming' && (
-        <IncomingRequest onAccept={acceptRequest} onReject={goOnline} />
+        <IncomingRequest onAccept={acceptRequest} onReject={backToOnline} />
       )}
       {screen === 'heading' && (
         <HeadingToPassenger onArrived={arrivedAtPassenger} onCancel={backToOnline} />
@@ -66,10 +99,10 @@ export function ConductorHome() {
         <TripFinished onNext={backToOnline} onClose={goOffline} />
       )}
       {screen === 'summary' && (
-        <DailySummary onBack={() => setScreen(online ? 'home-online' : 'home-offline')} />
+        <DailySummary onBack={() => setScreen(driverStatus === 'online' ? 'home-online' : 'home-offline')} />
       )}
       {screen === 'profile' && (
-        <Profile onBack={() => setScreen(online ? 'home-online' : 'home-offline')} />
+        <Profile onBack={() => setScreen(driverStatus === 'online' ? 'home-online' : 'home-offline')} />
       )}
     </div>
   );

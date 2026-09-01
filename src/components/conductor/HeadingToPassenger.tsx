@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Phone, MessageCircle, X, Check, MapPin, Navigation } from 'lucide-react';
+import { X, Check } from 'lucide-react';
 import styles from './Conductor.module.css';
 import { MiniMap } from './MiniMap';
 
@@ -11,8 +11,7 @@ type Props = {
 };
 
 export function HeadingToPassenger({ onArrived, onCancel }: Props) {
-  // Simulated ETA countdown
-  const [etaSec, setEtaSec] = useState(168); // 2:48
+  const [etaSec, setEtaSec] = useState(168);
   useEffect(() => {
     const t = setInterval(() => setEtaSec((s) => Math.max(0, s - 1)), 1000);
     return () => clearInterval(t);
@@ -28,50 +27,17 @@ export function HeadingToPassenger({ onArrived, onCancel }: Props) {
         <button className={styles.backButton} onClick={onCancel} aria-label="Cancelar viaje">
           <X size={18} />
         </button>
-        <div className={styles.screenTitle}>Dirigiéndote al pasajero</div>
+        <div className={styles.screenTitle}>Dirigiéndose al punto de recogida</div>
         <div style={{ width: 36 }} />
       </header>
 
-      <div className={styles.card}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <div
-            style={{
-              width: 44,
-              height: 44,
-              borderRadius: 999,
-              background: 'var(--surface-2)',
-              border: '1px solid var(--border)',
-              display: 'grid',
-              placeItems: 'center',
-              fontWeight: 600,
-              fontSize: 14,
-            }}
-            aria-hidden
-          >
-            LM
-          </div>
-          <div style={{ flex: 1 }}>
-            <div style={{ fontSize: 16, fontWeight: 600 }}>Luisa M.</div>
-            <div style={{ fontSize: 13, color: 'var(--fg-muted)' }}>
-              Jr. Piura 245
-            </div>
-          </div>
-          <button className={styles.iconButton} aria-label="Llamar">
-            <Phone size={16} />
-          </button>
-          <button className={styles.iconButton} aria-label="Mensaje">
-            <MessageCircle size={16} />
-          </button>
-        </div>
-      </div>
-
       <div className={`${styles.statusBlock} ${styles['statusBlock--accent']}`}>
-        <div className={styles.statusLabel}>Llegada estimada</div>
+        <div className={styles.statusLabel}>Llegada estimada al origen</div>
         <div className={`${styles.statusBig} num`}>
           {m}:{s.toString().padStart(2, '0')}
         </div>
         <div className={styles.statusSub}>
-          {distance} km · a Jr. Piura 245
+          {distance} km · Jr. Piura 245
         </div>
       </div>
 
@@ -91,7 +57,7 @@ export function HeadingToPassenger({ onArrived, onCancel }: Props) {
 
       <button className={styles.cta} onClick={onArrived}>
         <Check size={22} />
-        Ya llegué
+        Llegué al punto de recogida
       </button>
     </div>
   );

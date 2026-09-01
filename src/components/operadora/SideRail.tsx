@@ -9,7 +9,8 @@ import {
   Settings,
 } from 'lucide-react';
 import styles from './Operadora.module.css';
-import type { OperadoraRoute } from './OperadoraApp';
+
+type OperadoraRoute = 'despacho' | 'conductores' | 'unidades' | 'membresias' | 'reportes';
 
 type Props = {
   route: OperadoraRoute;

@@ -34,15 +34,17 @@ export function statusLabel(s: Unit['status']): string {
   switch (s) {
     case 'active': return 'Disponible';
     case 'on-trip': return 'En viaje';
+    case 'break': return 'Descanso';
     case 'offline': return 'Sin conexión';
     case 'blocked': return 'Bloqueada';
   }
 }
 
-export function statusColor(s: Unit['status']): 'success' | 'taxi' | 'muted' | 'danger' {
+export function statusColor(s: Unit['status']): 'success' | 'unit-trip' | 'unit-break' | 'muted' | 'danger' {
   switch (s) {
     case 'active': return 'success';
-    case 'on-trip': return 'taxi';
+    case 'on-trip': return 'unit-trip';
+    case 'break': return 'unit-break';
     case 'offline': return 'muted';
     case 'blocked': return 'danger';
   }

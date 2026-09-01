@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Star, MapPin, Navigation, Phone, MessageCircle, X, Check } from 'lucide-react';
+import { MapPin, Navigation, X, Check } from 'lucide-react';
 import styles from './Conductor.module.css';
 import { REQUESTS_INITIAL, formatPEN, formatKm } from '@/data';
 
@@ -11,7 +11,6 @@ type Props = {
 };
 
 export function IncomingRequest({ onAccept, onReject }: Props) {
-  // Simulate the request countdown (15 seconds to accept)
   const [secondsLeft, setSecondsLeft] = useState(15);
   const request = REQUESTS_INITIAL[0];
 
@@ -44,7 +43,7 @@ export function IncomingRequest({ onAccept, onReject }: Props) {
             aria-hidden
           />
           <span style={{ fontSize: 12, color: 'var(--fg-muted)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
-            Nueva solicitud
+            Nueva carrera
           </span>
         </div>
         <span
@@ -62,49 +61,6 @@ export function IncomingRequest({ onAccept, onReject }: Props) {
         </div>
         <div className={styles.statusSub}>
           {formatKm(request.distanceKm)} · {pickupEta} min de recogida
-        </div>
-      </div>
-
-      <div className={styles.card}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <div
-            style={{
-              width: 44,
-              height: 44,
-              borderRadius: 999,
-              background: 'var(--surface-2)',
-              border: '1px solid var(--border)',
-              display: 'grid',
-              placeItems: 'center',
-              fontWeight: 600,
-              fontSize: 14,
-            }}
-            aria-hidden
-          >
-            LM
-          </div>
-          <div style={{ flex: 1 }}>
-            <div style={{ fontSize: 16, fontWeight: 600 }}>{request.passengerName}</div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 13, color: 'var(--fg-muted)' }}>
-              <Star size={12} fill="#facc15" color="#facc15" />
-              <span className="num">{request.passengerRating}</span>
-              <span>· 23 viajes</span>
-            </div>
-          </div>
-          <button
-            className={styles.iconButton}
-            aria-label="Llamar"
-            style={{ width: 40, height: 40 }}
-          >
-            <Phone size={16} />
-          </button>
-          <button
-            className={styles.iconButton}
-            aria-label="Mensaje"
-            style={{ width: 40, height: 40 }}
-          >
-            <MessageCircle size={16} />
-          </button>
         </div>
       </div>
 
@@ -157,7 +113,7 @@ export function IncomingRequest({ onAccept, onReject }: Props) {
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '4px 0' }}>
         <Navigation size={14} color="var(--fg-muted)" />
         <span style={{ fontSize: 12, color: 'var(--fg-muted)' }}>
-          Sin desvíos · cobro en efectivo al pasajero
+          Despacho de la operadora · vía telefónica
         </span>
       </div>
 

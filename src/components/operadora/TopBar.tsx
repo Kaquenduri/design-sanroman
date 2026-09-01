@@ -1,9 +1,16 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { Sun, Moon } from 'lucide-react';
 import styles from './Operadora.module.css';
 
-export function TopBar({ now }: { now: Date | null }) {
+type Props = {
+  now: Date | null;
+  theme: 'dark' | 'light';
+  onToggleTheme: () => void;
+};
+
+export function TopBar({ now, theme, onToggleTheme }: Props) {
   const [elapsed, setElapsed] = useState(0);
   useEffect(() => {
     const t = setInterval(() => setElapsed((s) => s + 1), 1000);
@@ -44,6 +51,13 @@ export function TopBar({ now }: { now: Date | null }) {
           <span className={styles.statusPill__dot} />
           18 unidades en línea
         </span>
+        <button
+          className={styles.themeToggle}
+          onClick={onToggleTheme}
+          aria-label={theme === 'dark' ? 'Cambiar a modo claro' : 'Cambiar a modo oscuro'}
+        >
+          {theme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
+        </button>
         <span className={`${styles.shiftTimer} mono`} aria-label="Hora actual">
           {time}
         </span>

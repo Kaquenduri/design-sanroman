@@ -19,7 +19,7 @@ export type Unit = {
   modelo: string;
   anio: number;
   driverId: string | null;
-  status: 'active' | 'on-trip' | 'offline' | 'blocked';
+  status: 'active' | 'on-trip' | 'break' | 'offline' | 'blocked';
   lastSeenAt: string;
 };
 
@@ -34,16 +34,13 @@ export type Coordinates = { lat: number; lng: number };
 
 export type PendingRequest = {
   id: string;
-  passengerName: string;
-  passengerRating: number;
   pickupAddress: string;
   destinationAddress: string;
   pickup: Coordinates;
   destination: Coordinates;
   distanceKm: number;
   fareEstimate: number;
-  waitSeconds: number;
-  source: 'app' | 'telefono';
+  source: 'telefono';
   assignedUnitId: string | null;
 };
 
@@ -51,14 +48,12 @@ export type Trip = {
   id: string;
   driverId: string;
   unitId: string;
-  passengerName: string;
   pickupAddress: string;
   destinationAddress: string;
   fare: number;
   startedAt: string;
   finishedAt: string | null;
   status: 'completado' | 'en-curso' | 'cancelado';
-  ratingGiven: number | null;
 };
 
 export type UnitStatus = Unit['status'];

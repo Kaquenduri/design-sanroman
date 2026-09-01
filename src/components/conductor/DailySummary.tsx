@@ -1,6 +1,6 @@
 'use client';
 
-import { ArrowLeft, FileText, Clock, MapPin, Star, CheckCircle2 } from 'lucide-react';
+import { ArrowLeft, FileText, Clock, MapPin, CheckCircle2 } from 'lucide-react';
 import styles from './Conductor.module.css';
 import { TODAY_TRIPS, formatPEN } from '@/data';
 
@@ -9,8 +9,6 @@ type Props = { onBack: () => void };
 export function DailySummary({ onBack }: Props) {
   const total = TODAY_TRIPS.reduce((acc, t) => acc + t.fare, 0);
   const count = TODAY_TRIPS.length;
-  const avgRating =
-    TODAY_TRIPS.reduce((a, t) => a + (t.ratingGiven ?? 0), 0) / count;
 
   return (
     <div className={styles.screen}>
@@ -37,9 +35,9 @@ export function DailySummary({ onBack }: Props) {
           <div className={styles.kpiSub}>por viaje</div>
         </div>
         <div className={styles.kpi}>
-          <div className={styles.kpiLabel}>Valoración</div>
-          <div className={`${styles.kpiValue} num`}>{avgRating.toFixed(1)}</div>
-          <div className={styles.kpiSub}>estrellas</div>
+          <div className={styles.kpiLabel}>Completados</div>
+          <div className={`${styles.kpiValue} num`}>{count}</div>
+          <div className={styles.kpiSub}>carreras</div>
         </div>
       </div>
 
@@ -70,7 +68,6 @@ export function DailySummary({ onBack }: Props) {
           <div key={t.id} className={styles.card}>
             <div className={styles.cardRow}>
               <div>
-                <div style={{ fontSize: 14, fontWeight: 600 }}>{t.passengerName}</div>
                 <div
                   style={{
                     fontSize: 12,
@@ -78,7 +75,6 @@ export function DailySummary({ onBack }: Props) {
                     display: 'flex',
                     alignItems: 'center',
                     gap: 6,
-                    marginTop: 2,
                   }}
                 >
                   <Clock size={11} /> {t.startedAt}
@@ -104,7 +100,7 @@ export function DailySummary({ onBack }: Props) {
               <span />
               <span style={{ color: 'var(--fg-muted)' }}>{t.destinationAddress}</span>
             </div>
-            {t.ratingGiven !== null && (
+            {t.status === 'completado' && (
               <div
                 style={{
                   display: 'flex',
@@ -116,10 +112,7 @@ export function DailySummary({ onBack }: Props) {
                 }}
               >
                 <CheckCircle2 size={12} color="var(--success)" />
-                <span>Completado · </span>
-                {Array.from({ length: t.ratingGiven }).map((_, i) => (
-                  <Star key={i} size={11} fill="#facc15" color="#facc15" />
-                ))}
+                <span>Completado</span>
               </div>
             )}
           </div>

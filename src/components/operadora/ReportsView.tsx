@@ -27,14 +27,12 @@ export function ReportsView() {
       id: `tx-${i + 1}`,
       driverId: DRIVERS[(i + 3) % DRIVERS.length].id,
       unitId: `u${String((i + 3) % DRIVERS.length + 1).padStart(2, '0')}`,
-      passengerName: ['Lucía M.', 'Jorge C.', 'Eduardo P.', 'Rosa T.', 'Pedro L.', 'Sara A.'][i],
       pickupAddress: ['Jr. Piura 245', 'Av. El Sol 880', 'Plaza de Armas', 'Jr. Loreto 110', 'Calle 2 de Mayo 412', 'Av. Circunvalación 230'][i],
       destinationAddress: ['Urb. San Francisco', 'Hospital Carlos Monge', 'Jr. Puno 230', 'Mercado Túpac Amaru', 'Av. San Martín 1020', 'Terminal Terrestre'][i],
       fare: [8, 12, 7, 9, 11, 6.5][i],
       startedAt: ['11:55', '12:08', '12:24', '12:48', '13:02', '13:18'][i],
       finishedAt: ['12:14', '12:32', '12:38', '13:04', '13:22', '13:31'][i],
       status: 'completado' as const,
-      ratingGiven: [5, 4, 5, 5, 5, 4][i],
     })),
   ];
 
@@ -250,7 +248,7 @@ export function ReportsView() {
             <thead>
               <tr>
                 <th>Hora</th>
-                <th>Pasajero</th>
+                <th>Unidad</th>
                 <th>Origen → Destino</th>
                 <th style={{ textAlign: 'right' }}>Tarifa</th>
               </tr>
@@ -261,7 +259,7 @@ export function ReportsView() {
                   <td className={styles.mono} style={{ fontSize: 12 }}>
                     {t.startedAt}
                   </td>
-                  <td style={{ fontWeight: 500 }}>{t.passengerName}</td>
+                  <td style={{ fontWeight: 500 }}>{t.unitId.toUpperCase()}</td>
                   <td style={{ fontSize: 12, color: 'var(--fg-muted)' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                       <span>{t.pickupAddress}</span>

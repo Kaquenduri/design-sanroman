@@ -1,386 +1,362 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  Plus,
-  Minus,
-  Locate,
-  Clock,
-  MapPin,
-  Navigation,
-  User as UserIcon,
-  Phone,
-  PhoneCall,
-  X,
-  RefreshCw,
-  ChevronRight,
-  Truck,
+  X, MapPin, Navigation, Search, Check, Loader, Car, User, Clock,
 } from 'lucide-react';
 import styles from './Operadora.module.css';
-import {
-  REQUESTS_INITIAL,
-  DRIVERS,
-  UNITS,
-  UNIT_POSITIONS,
-  CITY_BOUNDS,
-  formatPEN,
-  formatKm,
-  statusLabel,
-  statusColor,
-  type PendingRequest,
-} from '@/data';
-import { DispatcherMap } from './DispatcherMap';
+import { UNITS, DRIVERS, UNIT_POSITIONS, CITY_BOUNDS, formatPEN, formatKm } from '@/data';
+import type { Coordinates, Unit } from '@/data';
 
-export function DispatcherView() {
-  const [requests, setRequests] = useState<PendingRequest[]>(REQUESTS_INITIAL);
-  const [selectedId, setSelectedId] = useState<string | null>(REQUESTS_INITIAL[0].id);
-  const [filter, setFilter] = useState<'all' | 'app' | 'telefono'>('all');
-  const [waitTick, setWaitTick] = useState(0);
+type DispatchPhase =
+  | 'idle'
+  | 'expanding'      // Radio expanding on map
+  | 'searching'      // "Buscando conductor..."
+  | 'found'          // "Conductor encontrado"
+  | 'accepted'       // "Carrera aceptada"
+  | 'en-route'       // "En camino"
+  | 'results'        // Legacy: manual result list
+  | 'assigned';      // Final confirmation
 
-  // Increment wait seconds every second
+type Props = {
+  origin: Coordinates | null;
+  destination: Coordinates | null;
+  onSetOrigin: (c: Coordinates | null) => void;
+  onSetDestination: (c: Coordinates | null) => void;
+  onClose: () => void;
+  onSearchRadiusChange: (radius: number | null) => void;
+  onSearchOriginChange: (origin: Coordinates | null) => void;
+  onHighlightUnit: (unitId: string | null) => void;
+};
+
+function distanceBetween(a: Coordinates, b: Coordinates): number {
+  const R = 6371;
+  const dLat = ((b.lat - a.lat) * Math.PI) / 180;
+  const dLng = ((b.lng - a.lng) * Math.PI) / 180;
+  const x =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos((a.lat * Math.PI) / 180) *
+      Math.cos((b.lat * Math.PI) / 180) *
+      Math.sin(dLng / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(x), Math.sqrt(1 - x));
+}
+
+function formatCoords(c: Coordinates): string {
+  return `${c.lat.toFixed(5)}, ${c.lng.toFixed(5)}`;
+}
+
+function estimateFare(km: number): number {
+  const base = 4.5;
+  const perKm = 1.8;
+  return +(base + km * perKm).toFixed(2);
+}
+
+const STATUS_COLOR: Record<Unit['status'], string> = {
+  active: 'var(--unit-active)',
+  'on-trip': 'var(--unit-trip)',
+  break: 'var(--unit-break)',
+  offline: 'var(--fg-subtle)',
+  blocked: 'var(--danger)',
+};
+
+const PHASE_LABELS: Record<DispatchPhase, string> = {
+  idle: '',
+  expanding: 'Expandiendo radio de búsqueda…',
+  searching: 'Buscando conductor disponible…',
+  found: 'Conductor encontrado',
+  accepted: 'Carrera aceptada',
+  'en-route': 'En camino al cliente',
+  results: '',
+  assigned: 'Carrera asignada',
+};
+
+const PHASE_ICONS: Record<string, typeof Search> = {
+  expanding: Loader,
+  searching: Search,
+  found: User,
+  accepted: Check,
+  'en-route': Car,
+};
+
+export function DispatcherView({
+  origin,
+  destination,
+  onSetOrigin,
+  onSetDestination,
+  onClose,
+  onSearchRadiusChange,
+  onSearchOriginChange,
+  onHighlightUnit,
+}: Props) {
+  const [originText, setOriginText] = useState('');
+  const [destText, setDestText] = useState('');
+  const [assignedUnit, setAssignedUnit] = useState<Unit | null>(null);
+  const [searching, setSearching] = useState(false);
+  const [searchPhase, setSearchPhase] = useState<DispatchPhase>('idle');
+  const [selectedUnit, setSelectedUnit] = useState<Unit | null>(null);
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const timeoutsRef = useRef<ReturnType<typeof setTimeout>[]>([]);
+
+  /* Escape key closes */
   useEffect(() => {
-    const id = setInterval(() => setWaitTick((x) => x + 1), 1000);
-    return () => clearInterval(id);
+    const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [onClose]);
+
+  /* Auto-fill text when map click sets a point */
+  useEffect(() => {
+    if (origin && !originText) setOriginText(formatCoords(origin));
+  }, [origin, originText]);
+
+  useEffect(() => {
+    if (destination && !destText) setDestText(formatCoords(destination));
+  }, [destination, destText]);
+
+  const effectiveOrigin = useMemo(() => {
+    if (origin) return origin;
+    if (originText.trim().length > 0) return { lat: -15.4975, lng: -70.130 };
+    return null;
+  }, [origin, originText]);
+
+  const distanceKm = useMemo(() => {
+    const dest = destination || (destText.trim().length > 0 ? { lat: -15.489, lng: -70.125 } : null);
+    if (effectiveOrigin && dest) return +distanceBetween(effectiveOrigin, dest).toFixed(1);
+    return null;
+  }, [effectiveOrigin, destination, destText]);
+
+  const fareEstimate = useMemo(() => {
+    if (distanceKm !== null) return estimateFare(distanceKm);
+    return null;
+  }, [distanceKm]);
+
+  /* ── Full automated dispatch flow ─── */
+  const startDispatch = useCallback(() => {
+    if (!effectiveOrigin) return;
+    setSearching(true);
+    setSearchPhase('expanding');
+    setSelectedUnit(null);
+    setAssignedUnit(null);
+    onSearchOriginChange(effectiveOrigin);
+    onHighlightUnit(null);
+
+    let radius = 0;
+    intervalRef.current = setInterval(() => {
+      radius += 8;
+      if (radius >= 500) radius = 500;
+      onSearchRadiusChange(radius);
+
+      if (radius >= 300) setSearchPhase('searching');
+
+      if (radius >= 400 && intervalRef.current) {
+        clearInterval(intervalRef.current);
+        intervalRef.current = null;
+
+        // Find nearest available unit
+        const available = UNITS.filter(u => u.status === 'active' && u.driverId !== null);
+        const withDist = available.map(u => ({
+          unit: u,
+          dist: distanceBetween(effectiveOrigin, UNIT_POSITIONS[u.id] ?? effectiveOrigin),
+        }));
+        withDist.sort((a, b) => a.dist - b.dist);
+        const chosen = withDist[0]?.unit ?? null;
+
+        // Phase: "Conductor encontrado" after 1.5s
+        const t1 = setTimeout(() => {
+          setSearchPhase('found');
+          setSearching(false);
+          if (chosen) {
+            setSelectedUnit(chosen);
+            onHighlightUnit(chosen.id);
+          }
+        }, 1500);
+
+        // Phase: "Carrera aceptada" after 3.5s
+        const t2 = setTimeout(() => {
+          setSearchPhase('accepted');
+        }, 3500);
+
+        // Phase: "En camino" after 5s
+        const t3 = setTimeout(() => {
+          setSearchPhase('en-route');
+          // Fade out search radius
+          let fadeR = 500;
+          const fadeInterval = setInterval(() => {
+            fadeR -= 15;
+            if (fadeR <= 0) {
+              onSearchRadiusChange(null);
+              onSearchOriginChange(null);
+              clearInterval(fadeInterval);
+            } else {
+              onSearchRadiusChange(fadeR);
+            }
+          }, 30);
+        }, 5000);
+
+        // Phase: "Assigned" final confirmation after 7s
+        const t4 = setTimeout(() => {
+          if (chosen) {
+            setAssignedUnit(chosen);
+            setSearchPhase('assigned');
+          }
+        }, 7000);
+
+        timeoutsRef.current = [t1, t2, t3, t4];
+      }
+    }, 50);
+  }, [effectiveOrigin, onSearchRadiusChange, onSearchOriginChange, onHighlightUnit]);
+
+  /* Cleanup on unmount */
+  useEffect(() => {
+    return () => {
+      if (intervalRef.current) clearInterval(intervalRef.current);
+      timeoutsRef.current.forEach(t => clearTimeout(t));
+    };
   }, []);
 
-  // Simulate new requests arriving every ~25s
+  /* Auto-close after final assignment */
   useEffect(() => {
-    let id = 0;
-    const interval = setInterval(() => {
-      id++;
-      const seeds = [
-        { name: 'Roxana P.', addr: 'Jr. Moquegua 412', dest: 'Urb. Los Olivos', fare: 9 },
-        { name: 'Andrés M.', addr: 'Av. El Sol 1050', dest: 'Jr. Puno 230', fare: 7.5 },
-        { name: 'Camila Q.', addr: 'Calle 2 de Mayo 88', dest: 'Mercado San José', fare: 6 },
-      ];
-      const seed = seeds[id % seeds.length];
-      const newReq: PendingRequest = {
-        id: `r-${2000 + id}`,
-        passengerName: seed.name,
-        passengerRating: 4.7 + Math.random() * 0.3,
-        pickupAddress: seed.addr,
-        destinationAddress: seed.dest,
-        pickup: UNIT_POSITIONS[UNITS[0].id],
-        destination: UNIT_POSITIONS[UNITS[3].id],
-        distanceKm: +(2 + Math.random() * 4).toFixed(1),
-        fareEstimate: seed.fare,
-        waitSeconds: 0,
-        source: Math.random() > 0.5 ? 'app' : 'telefono',
-        assignedUnitId: null,
-      };
-      setRequests((rs) => [newReq, ...rs].slice(0, 10));
-    }, 25000);
-    return () => clearInterval(interval);
-  }, []);
+    if (assignedUnit && searchPhase === 'assigned') {
+      const t = setTimeout(() => {
+        onHighlightUnit(null);
+        onClose();
+      }, 4000);
+      return () => clearTimeout(t);
+    }
+  }, [assignedUnit, searchPhase, onClose, onHighlightUnit]);
 
-  const filtered = useMemo(
-    () =>
-      filter === 'all'
-        ? requests
-        : requests.filter((r) => r.source === filter),
-    [filter, requests]
-  );
-
-  const selected = requests.find((r) => r.id === selectedId) ?? null;
-  const assignedUnit = selected?.assignedUnitId
-    ? UNITS.find((u) => u.id === selected.assignedUnitId) ?? null
-    : null;
-  const assignedDriver = assignedUnit
-    ? DRIVERS.find((d) => d.id === assignedUnit.driverId) ?? null
-    : null;
-
-  const fmtWait = (s: number) => {
-    const m = Math.floor(s / 60);
-    const sec = s % 60;
-    return `${m}:${String(sec).padStart(2, '0')}`;
+  const driverName = (unit: Unit) => {
+    if (!unit.driverId) return 'Sin conductor';
+    return DRIVERS.find(d => d.id === unit.driverId)?.name ?? 'Sin conductor';
   };
 
-  return (
-    <div className={styles.dispatcher}>
-      <aside className={styles.queue} aria-label="Cola de solicitudes">
-        <div className={styles.queue__head}>
-          <div>
-            <div className={styles.queue__title}>Solicitudes pendientes</div>
-            <div className={styles.queue__count}>
-              {requests.length} en cola · tiempo real
+  const nearestDist = (unit: Unit) => {
+    if (!effectiveOrigin) return '—';
+    const d = distanceBetween(effectiveOrigin, UNIT_POSITIONS[unit.id] ?? effectiveOrigin);
+    return `${d.toFixed(1)} km`;
+  };
+
+  /* Status indicator component */
+  const StatusIndicator = () => {
+    if (searchPhase === 'idle' || searchPhase === 'results') return null;
+    const label = PHASE_LABELS[searchPhase];
+    const IconComp = PHASE_ICONS[searchPhase] ?? Loader;
+    const isActive = ['expanding', 'searching'].includes(searchPhase);
+    const isSuccess = ['found', 'accepted', 'en-route', 'assigned'].includes(searchPhase);
+
+    return (
+      <div className={styles.dispatchStatus} data-success={isSuccess || undefined}>
+        <div className={styles.dispatchStatus__icon} data-spin={isActive || undefined}>
+          <IconComp size={18} />
+        </div>
+        <div className={styles.dispatchStatus__info}>
+          <div className={styles.dispatchStatus__label}>{label}</div>
+          {selectedUnit && searchPhase !== 'expanding' && searchPhase !== 'searching' && (
+            <div className={styles.dispatchStatus__detail}>
+              <span className={styles.dispatchStatus__placa}>{selectedUnit.placa}</span>
+              <span className={styles.dispatchStatus__driver}>{driverName(selectedUnit)}</span>
             </div>
-          </div>
-          <button
-            className={styles.actionBtn}
-            aria-label="Actualizar"
-            onClick={() => setWaitTick((x) => x + 1)}
-          >
-            <RefreshCw size={12} />
-          </button>
+          )}
         </div>
-        <div className={styles.queue__filters}>
-          {(['all', 'app', 'telefono'] as const).map((f) => (
-            <button
-              key={f}
-              className={`${styles.chipFilter} ${filter === f ? styles['chipFilter--active'] : ''}`}
-              onClick={() => setFilter(f)}
-            >
-              {f === 'all' ? 'Todas' : f === 'app' ? 'App' : 'Teléfono'}
-            </button>
-          ))}
-        </div>
-        <div className={styles.queue__list}>
-          {filtered.map((r) => {
-            const isSel = selectedId === r.id;
-            const totalWait = r.waitSeconds + waitTick;
-            const isHot = totalWait > 90;
+        {/* Phase timeline dots */}
+        <div className={styles.dispatchTimeline}>
+          {(['expanding', 'searching', 'found', 'accepted', 'en-route'] as DispatchPhase[]).map((ph, i) => {
+            const phases: DispatchPhase[] = ['expanding', 'searching', 'found', 'accepted', 'en-route'];
+            const currentIdx = phases.indexOf(searchPhase);
+            const thisIdx = i;
             return (
-              <button
-                key={r.id}
-                className={`${styles.queueItem} ${isSel ? styles['queueItem--selected'] : ''}`}
-                onClick={() => setSelectedId(r.id)}
-                style={{ width: '100%', textAlign: 'left' }}
-              >
-                <div className={styles.queueItem__head}>
-                  <span className={styles.queueItem__id}>#{r.id}</span>
-                  <span
-                    className={`${styles.queueItem__wait} ${isHot ? styles['queueItem__wait--hot'] : ''}`}
-                  >
-                    <Clock size={10} style={{ marginRight: 4, verticalAlign: -1 }} />
-                    {fmtWait(totalWait)}
-                  </span>
-                </div>
-                <div className={styles.queueItem__passenger}>{r.passengerName}</div>
-                <div className={styles.queueItem__row}>
-                  <MapPin size={11} />
-                  <span>{r.pickupAddress}</span>
-                </div>
-                <div className={styles.queueItem__row}>
-                  <Navigation size={11} />
-                  <span>{r.destinationAddress}</span>
-                </div>
-                <div
-                  className={`${styles.queueItem__foot} ${isSel ? styles['queueItem__foot--selected'] : ''}`}
-                >
-                  <span className={styles.queueItem__price}>{formatPEN(r.fareEstimate)}</span>
-                  {r.assignedUnitId ? (
-                    <span className={styles.queueItem__assigned}>
-                      <Truck size={11} /> {r.assignedUnitId.toUpperCase()} · reasignar
-                    </span>
-                  ) : (
-                    <span style={{ display: 'inline-flex', gap: 6, alignItems: 'center' }}>
-                      {r.source === 'telefono' && (
-                        <span className={styles.sourceTag}>
-                          <PhoneCall size={10} /> Tel
-                        </span>
-                      )}
-                      <span className={styles.queueItem__assigned}>
-                        Sin asignar <ChevronRight size={11} />
-                      </span>
-                    </span>
-                  )}
-                </div>
-              </button>
+              <div key={ph} className={styles.dispatchTimeline__dot}
+                data-active={thisIdx <= currentIdx || undefined}
+                data-current={thisIdx === currentIdx || undefined}
+              />
             );
           })}
         </div>
-      </aside>
+      </div>
+    );
+  };
 
-      <section className={styles.map} aria-label="Mapa de despacho">
-        <div className={styles.map__header}>
-          <div className={styles.mapBadge}>
-            <span className={styles.mapBadge__live} />
-            Mapa · Juliaca centro
-            <span style={{ color: 'var(--fg-muted)', marginLeft: 8 }}>
-              {Object.keys(UNIT_POSITIONS).length} unidades
-            </span>
-          </div>
-          <div className={styles.mapBadge}>
-            <Clock size={12} color="var(--fg-muted)" />
-            <span className="mono">
-              {new Date().toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false })}
-            </span>
-          </div>
-        </div>
-
-        <div className={styles.map__canvas}>
-          <DispatcherMap
-            units={UNITS}
-            positions={UNIT_POSITIONS}
-            bounds={CITY_BOUNDS}
-            requests={requests}
-            selectedRequestId={selectedId}
-          />
-        </div>
-
-        <div className={styles.map__legend}>
-          <span className={styles.legendItem}>
-            <span className={styles.legendDot} style={{ background: 'var(--success)' }} />
-            Disponible
-          </span>
-          <span className={styles.legendItem}>
-            <span className={styles.legendDot} style={{ background: 'var(--taxi)' }} />
-            En viaje
-          </span>
-          <span className={styles.legendItem}>
-            <span className={styles.legendDot} style={{ background: 'var(--fg-subtle)' }} />
-            Sin conexión
-          </span>
-          <span className={styles.legendItem}>
-            <span className={styles.legendDot} style={{ background: 'var(--danger)' }} />
-            Bloqueada
-          </span>
-        </div>
-
-        <div className={styles.map__controls}>
-          <button className={styles.mapControl} aria-label="Zoom in">
-            <Plus size={16} />
-          </button>
-          <button className={styles.mapControl} aria-label="Zoom out">
-            <Minus size={16} />
-          </button>
-          <button className={styles.mapControl} aria-label="Centrar">
-            <Locate size={16} />
+  return (
+    <>
+      <div className={styles.assignPanelOverlay} onClick={onClose} />
+      <div className={styles.assignPanel}>
+        <div className={styles.assignPanel__header}>
+          <div className={styles.assignPanel__title}>Nueva asignación</div>
+          <button className={styles.assignPanel__close} onClick={onClose} aria-label="Cerrar">
+            <X size={18} />
           </button>
         </div>
-      </section>
 
-      <aside className={styles.detail} aria-label="Detalle">
-        {selected ? (
-          <>
-            <div className={styles.detail__head}>
-              <div className={styles.detail__title}>{selected.passengerName}</div>
-              <div className={styles.detail__sub}>
-                Solicitud #{selected.id} ·{' '}
-                {selected.source === 'telefono' ? 'Canal teléfono' : 'App pasajero'}
+        <div className={styles.assignPanel__body}>
+          {assignedUnit && searchPhase === 'assigned' ? (
+            <div className={styles.assignedConfirm}>
+              <div className={styles.assignedConfirm__check}>
+                <Check size={32} color="var(--success)" />
+              </div>
+              <div className={styles.assignedConfirm__title}>Carrera asignada</div>
+              <div className={styles.assignedConfirm__placa}>{assignedUnit.placa}</div>
+              <div className={styles.assignedConfirm__sub}>{driverName(assignedUnit)}</div>
+              <div className={styles.assignedConfirm__sub} style={{ opacity: 0.6 }}>
+                <Clock size={12} style={{ marginRight: 4, verticalAlign: -1 }} />
+                Cerrando automáticamente…
               </div>
             </div>
-            <div className={styles.detail__body}>
-              <div className={styles.kpiRow}>
-                <div className={styles.kpiCard}>
-                  <div className={styles.kpiLabel}>Tarifa est.</div>
-                  <div className={styles.kpiValue}>{formatPEN(selected.fareEstimate)}</div>
+          ) : (
+            <>
+              {/* Origin */}
+              <div className={styles.assignField}>
+                <div className={styles.assignField__label}>Origen</div>
+                <div className={styles.assignField__input}>
+                  <MapPin size={14} color="var(--success)" />
+                  <input type="text" placeholder="Dirección de recogida" value={originText}
+                    onChange={e => { setOriginText(e.target.value); onSetOrigin(null); }} />
                 </div>
-                <div className={styles.kpiCard}>
-                  <div className={styles.kpiLabel}>Distancia</div>
-                  <div className={styles.kpiValue}>{formatKm(selected.distanceKm)}</div>
-                </div>
+                <div className={styles.assignField__hint}>Escribe la dirección o haz clic en el mapa</div>
+                {origin && <div className={styles.assignField__coords}>{formatCoords(origin)}</div>}
               </div>
 
-              <div>
-                <div className={styles.sectionTitle}>Recogida</div>
-                <div
-                  style={{
-                    background: 'var(--surface)',
-                    border: '1px solid var(--border)',
-                    borderRadius: 'var(--radius-md)',
-                    padding: 12,
-                    fontSize: 13,
-                    display: 'flex',
-                    gap: 8,
-                  }}
-                >
-                  <MapPin size={14} color="var(--accent)" style={{ marginTop: 2 }} />
-                  <span>{selected.pickupAddress}</span>
+              {/* Destination */}
+              <div className={styles.assignField}>
+                <div className={styles.assignField__label}>Destino</div>
+                <div className={styles.assignField__input}>
+                  <Navigation size={14} color="var(--danger)" />
+                  <input type="text" placeholder="Dirección de destino" value={destText}
+                    onChange={e => { setDestText(e.target.value); onSetDestination(null); }} />
                 </div>
+                <div className={styles.assignField__hint}>Escribe la dirección o haz clic en el mapa</div>
+                {destination && <div className={styles.assignField__coords}>{formatCoords(destination)}</div>}
               </div>
 
-              <div>
-                <div className={styles.sectionTitle}>Destino</div>
-                <div
-                  style={{
-                    background: 'var(--surface)',
-                    border: '1px solid var(--border)',
-                    borderRadius: 'var(--radius-md)',
-                    padding: 12,
-                    fontSize: 13,
-                    display: 'flex',
-                    gap: 8,
-                  }}
-                >
-                  <Navigation size={14} color="var(--taxi)" style={{ marginTop: 2 }} />
-                  <span>{selected.destinationAddress}</span>
-                </div>
-              </div>
-
-              {assignedUnit && assignedDriver ? (
-                <div>
-                  <div className={styles.sectionTitle}>Unidad asignada</div>
-                  <div
-                    style={{
-                      background: 'var(--accent-soft)',
-                      border: '1px solid rgba(37,99,235,0.4)',
-                      borderRadius: 'var(--radius-md)',
-                      padding: 12,
-                      display: 'flex',
-                      flexDirection: 'column',
-                      gap: 10,
-                    }}
-                  >
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                      <div className={styles.avatarSm} style={{ width: 32, height: 32 }}>
-                        {assignedDriver.avatarSeed}
-                      </div>
-                      <div style={{ flex: 1 }}>
-                        <div style={{ fontSize: 13, fontWeight: 600 }}>
-                          {assignedDriver.name}
-                        </div>
-                        <div
-                          className="mono"
-                          style={{ fontSize: 11, color: 'var(--fg-muted)' }}
-                        >
-                          {assignedUnit.placa} · #{assignedUnit.id.replace('u', '')}
-                        </div>
-                      </div>
-                      <button className={styles.actionBtn}>
-                        <Phone size={12} /> Llamar
-                      </button>
-                    </div>
-                    <div style={{ display: 'flex', gap: 8 }}>
-                      <button className={styles.actionBtn} style={{ flex: 1, justifyContent: 'center' }}>
-                        Reasignar
-                      </button>
-                      <button className={styles.actionBtn} style={{ flex: 1, justifyContent: 'center' }}>
-                        Ver unidad
-                      </button>
-                    </div>
+              {/* Fare estimate */}
+              {distanceKm !== null && fareEstimate !== null && (
+                <div className={styles.assignFare}>
+                  <div>
+                    <div className={styles.assignFare__label}>Distancia</div>
+                    <div style={{ fontSize: 13, fontWeight: 600 }}>{formatKm(distanceKm)}</div>
                   </div>
-                </div>
-              ) : (
-                <div>
-                  <div className={styles.sectionTitle}>Asignación</div>
-                  <button
-                    className={styles.actionBtn}
-                    style={{
-                      width: '100%',
-                      justifyContent: 'center',
-                      background: 'var(--accent)',
-                      color: 'var(--accent-fg)',
-                      borderColor: 'var(--accent)',
-                      padding: '12px 14px',
-                      fontSize: 13,
-                    }}
-                  >
-                    Asignar unidad más cercana
-                  </button>
-                  <div
-                    style={{
-                      fontSize: 11,
-                      color: 'var(--fg-muted)',
-                      marginTop: 8,
-                      textAlign: 'center',
-                    }}
-                  >
-                    Sugerida: U08 · 0.6 km de distancia
+                  <div style={{ textAlign: 'right' }}>
+                    <div className={styles.assignFare__label}>Tarifa est.</div>
+                    <div className={styles.assignFare__value}>{formatPEN(fareEstimate)}</div>
                   </div>
                 </div>
               )}
-            </div>
-          </>
-        ) : (
-          <div className={styles.detail__head}>
-            <div className={styles.detail__title}>Selecciona una solicitud</div>
-            <div className={styles.detail__sub}>
-              Los detalles del pasajero y la asignación aparecerán aquí
-            </div>
-          </div>
-        )}
-      </aside>
-    </div>
+
+              {/* Status indicator */}
+              <StatusIndicator />
+
+              {/* Search button */}
+              {searchPhase === 'idle' && (
+                <button className={styles.assignTriggerBtn}
+                  style={{ width: '100%', justifyContent: 'center', fontSize: 14 }}
+                  onClick={startDispatch} disabled={!effectiveOrigin}>
+                  <Search size={16} />
+                  Buscar conductor cercano
+                </button>
+              )}
+            </>
+          )}
+        </div>
+      </div>
+    </>
   );
 }

@@ -17,10 +17,10 @@
   --fg-subtle: #6b7589;
 
   /* Accents */
-  --accent: #2563eb;
+  --accent: #7B3BEC;
   --accent-fg: #ffffff;
-  --accent-soft: rgba(37, 99, 235, 0.12);
-  --accent-soft-strong: rgba(37, 99, 235, 0.24);
+  --accent-soft: rgba(123, 59, 236, 0.12);
+  --accent-soft-strong: rgba(123, 59, 236, 0.24);
 
   --taxi: #facc15;
   --taxi-fg: #0b1220;
@@ -34,6 +34,14 @@
   --danger-soft: rgba(220, 38, 38, 0.14);
   --info: #38bdf8;
   --info-soft: rgba(56, 189, 248, 0.14);
+
+  /* Unit status colors */
+  --unit-active: #16a34a;
+  --unit-active-soft: rgba(22, 163, 74, 0.18);
+  --unit-break: #eab308;
+  --unit-break-soft: rgba(234, 179, 8, 0.18);
+  --unit-trip: #7B3BEC;
+  --unit-trip-soft: rgba(123, 59, 236, 0.18);
 
   /* Type scale — mobile-first base */
   --text-xs: 0.75rem;     /* 12 */
@@ -96,6 +104,40 @@
   --rail-w: 240px;
   --queue-w: 340px;
   --detail-w: 360px;
+}
+
+/* Light mode */
+[data-theme="light"] {
+  --bg: #f8f9fc;
+  --surface: #ffffff;
+  --surface-2: #f1f3f8;
+  --surface-3: #e4e8f0;
+  --border: #d1d5e0;
+  --fg: #111827;
+  --fg-muted: #6b7280;
+  --fg-subtle: #9ca3af;
+  --accent: #7B3BEC;
+  --accent-fg: #ffffff;
+  --accent-soft: rgba(123, 59, 236, 0.08);
+  --accent-soft-strong: rgba(123, 59, 236, 0.16);
+  --taxi: #ca8a04;
+  --taxi-fg: #ffffff;
+  --success: #16a34a;
+  --success-soft: rgba(22, 163, 74, 0.08);
+  --warning: #d97706;
+  --warning-soft: rgba(217, 119, 6, 0.08);
+  --danger: #dc2626;
+  --danger-soft: rgba(220, 38, 38, 0.08);
+  --unit-active: #16a34a;
+  --unit-active-soft: rgba(22, 163, 74, 0.12);
+  --unit-break: #ca8a04;
+  --unit-break-soft: rgba(202, 138, 4, 0.12);
+  --unit-trip: #7B3BEC;
+  --unit-trip-soft: rgba(123, 59, 236, 0.12);
+  --shadow-card: 0 1px 0 0 rgba(0,0,0,0.04) inset, 0 6px 16px -10px rgba(0,0,0,0.08);
+  --shadow-card-hover: 0 1px 0 0 rgba(0,0,0,0.06) inset, 0 12px 28px -12px rgba(0,0,0,0.12);
+  --shadow-sheet: 0 -8px 24px -8px rgba(0,0,0,0.1), 0 -1px 0 0 rgba(0,0,0,0.04) inset;
+  --shadow-modal: 0 24px 64px -16px rgba(0,0,0,0.2);
 }
 
 /* ============================================

@@ -1,6 +1,6 @@
 'use client';
 
-import { ArrowLeft, ShieldCheck, Phone, Star, LogOut, Bell } from 'lucide-react';
+import { ArrowLeft, ShieldCheck, Phone, LogOut, Bell } from 'lucide-react';
 import styles from './Conductor.module.css';
 import { DRIVERS, MEMBERSHIPS, UNITS, membershipBadge } from '@/data';
 
@@ -52,9 +52,6 @@ export function Profile({ onBack }: Props) {
               color: 'var(--fg-muted)',
             }}
           >
-            <Star size={12} fill="#facc15" color="#facc15" />
-            <span className="num">{driver.rating}</span>
-            <span>·</span>
             <span>{driver.tripsToday} viajes hoy</span>
           </div>
         </div>

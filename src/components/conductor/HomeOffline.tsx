@@ -7,18 +7,21 @@ import {
   FileText,
   ShieldCheck,
   MapPin,
+  Coffee,
 } from 'lucide-react';
 import styles from './Conductor.module.css';
 import { MEMBERSHIPS, formatPEN } from '@/data';
+import type { DriverStatus } from './ConductorHome';
 
 type Props = {
   onGoOnline: () => void;
+  onGoBreak: () => void;
+  driverStatus: DriverStatus;
   onProfile: () => void;
   onSummary: () => void;
 };
 
-export function HomeOffline({ onGoOnline, onProfile, onSummary }: Props) {
-  // Demo driver membership: d01 has an active membership.
+export function HomeOffline({ onGoOnline, onGoBreak, driverStatus, onProfile, onSummary }: Props) {
   const membership = MEMBERSHIPS.find((m) => m.driverId === 'd01')!;
 
   return (
@@ -55,16 +58,28 @@ export function HomeOffline({ onGoOnline, onProfile, onSummary }: Props) {
           <div className={styles.kpiSub}>8 viajes</div>
         </div>
         <div className={styles.kpi}>
-          <div className={styles.kpiLabel}>Valorac.</div>
-          <div className={`${styles.kpiValue}`}>4.9</div>
-          <div className={styles.kpiSub}>estrellas</div>
+          <div className={styles.kpiLabel}>Horas</div>
+          <div className={`${styles.kpiValue} num`}>4h 28m</div>
+          <div className={styles.kpiSub}>conectado</div>
         </div>
       </div>
 
-      <button className={styles.cta} onClick={onGoOnline}>
-        <Power size={22} strokeWidth={2} />
-        Conectarme
-      </button>
+      <div className={styles.statusToggle}>
+        <button
+          className={`${styles.statusToggleBtn} ${styles['statusToggleBtn--active']}`}
+          onClick={onGoOnline}
+        >
+          <Power size={16} />
+          Ponerme en línea
+        </button>
+        <button
+          className={styles.statusToggleBtn}
+          onClick={onGoBreak}
+        >
+          <Coffee size={16} />
+          Descanso
+        </button>
+      </div>
 
       <div className={styles.spacer} />
 
