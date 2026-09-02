@@ -6,6 +6,8 @@
    ========================================================================== */
 
 .app {
+  position: relative;
+  isolation: isolate;
   display: flex;
   flex-direction: column;
   height: 100vh;
@@ -156,19 +158,30 @@
 
 /* ------------------------------------------------------- Dock inferior --- */
 
-/* La franja reserva su propia altura: el dock parece flotar como en Apple,
-   pero nunca se superpone a la leyenda ni a las herramientas del mapa. */
+/* La navegación vive sobre el mapa: el contenedor no pinta ni reserva una
+   franja que corte la continuidad cartográfica. */
 .dockArea {
-  height: 82px;
-  flex-shrink: 0;
-  display: grid;
-  place-items: center;
-  padding: var(--s-2) var(--s-5) var(--s-3);
-  background: var(--surface);
-  box-shadow: inset 0 1px 0 var(--border);
+  position: absolute;
+  right: 0;
+  bottom: var(--s-4);
+  left: 0;
+  z-index: 10;
+  display: flex;
+  justify-content: center;
+  padding-inline: var(--s-5);
+  pointer-events: none;
+}
+
+/* En despacho el dock pertenece visualmente al lienzo cartográfico, no a las
+   columnas de cola y detalle que lo rodean. */
+.dockAreaMap {
+  right: var(--detail-w);
+  left: var(--queue-w);
 }
 
 .dock {
+  position: relative;
+  isolation: isolate;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -177,9 +190,24 @@
   height: 62px;
   padding: var(--s-1) var(--s-2);
   border-radius: var(--r-2xl);
-  background: var(--glass);
-  backdrop-filter: blur(24px) saturate(1.45);
-  box-shadow: inset 0 0 0 1px var(--glass-border), var(--sh-lg);
+  background: linear-gradient(145deg, var(--glass), var(--glass-strong));
+  -webkit-backdrop-filter: blur(28px) saturate(1.6);
+  backdrop-filter: blur(28px) saturate(1.6);
+  box-shadow: inset 0 0 0 1px var(--glass-border),
+    inset 0 1px 0 var(--border-hair), var(--sh-lg), var(--sh-brand);
+  pointer-events: auto;
+}
+
+/* El reflejo diagonal da lectura de vidrio sin competir con los controles. */
+.dock::before {
+  content: '';
+  position: absolute;
+  inset: 1px;
+  z-index: -1;
+  border-radius: inherit;
+  background: linear-gradient(135deg, var(--glass-border), transparent 42%);
+  opacity: 0.55;
+  pointer-events: none;
 }
 
 .dockItem {
@@ -200,14 +228,14 @@
 
 .dockItem:hover {
   color: var(--fg);
-  background: var(--surface-2);
+  background: var(--brand-a08);
   transform: translateY(-2px);
 }
 
 .dockActive {
   color: var(--fg);
-  background: var(--surface-3);
-  box-shadow: inset 0 0 0 1px var(--border-strong), var(--sh-sm);
+  background: var(--brand-a16);
+  box-shadow: inset 0 0 0 1px var(--brand-a40), var(--sh-sm);
 }
 
 .dockActive .dockIcon {
@@ -260,16 +288,23 @@
   align-items: center;
   justify-content: center;
   color: var(--fg-subtle);
+  box-shadow: inset 0 0 0 1px var(--border-hair);
   transition: background var(--t-fast) var(--ease),
-    color var(--t-fast) var(--ease);
+    color var(--t-fast) var(--ease), transform var(--t-fast) var(--ease);
 }
 
 .dockMore:hover {
-  background: var(--surface-2);
+  background: var(--brand-a08);
   color: var(--fg);
+  transform: rotate(8deg);
 }
 
 @media (max-width: 900px) {
+  .dockArea {
+    bottom: var(--s-3);
+    padding-inline: var(--s-3);
+  }
+
   .dock {
     min-width: 0;
     width: min(100%, 520px);
@@ -513,7 +548,7 @@
 .mapLegend {
   position: absolute;
   left: var(--s-3);
-  bottom: var(--s-3);
+  bottom: 92px;
   z-index: 2;
   display: flex;
   gap: var(--s-4);
@@ -542,7 +577,7 @@
 .mapTools {
   position: absolute;
   right: var(--s-3);
-  bottom: var(--s-3);
+  bottom: 92px;
   z-index: 2;
   display: flex;
   flex-direction: column;
@@ -982,6 +1017,11 @@
 }
 
 @media (max-width: 1180px) {
+  .dockAreaMap {
+    right: 0;
+    left: 300px;
+  }
+
   .dispatcher {
     grid-template-columns: 300px 1fr;
   }

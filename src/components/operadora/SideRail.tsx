@@ -32,7 +32,9 @@ export function BottomNav({
   onRoute: (r: Route) => void;
 }) {
   return (
-    <div className={s.dockArea}>
+    <div
+      className={`${s.dockArea} ${route === 'despacho' ? s.dockAreaMap : ''}`}
+    >
       <nav className={s.dock} aria-label="Navegación del panel">
         {ITEMS.map((it) => {
           const Icon = it.icon;
