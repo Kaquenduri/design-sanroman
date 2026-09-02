@@ -1,358 +1,893 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
 import {
+  useEffect,
+  useMemo,
+  useState,
+} from 'react';
+import dynamic from 'next/dynamic';
+import {
+  ArrowRight,
+  BadgeCheck,
+  Banknote,
+  Check,
   Clock,
+  Crosshair,
+  LoaderCircle,
   MapPin,
   Navigation,
-  PhoneCall,
-  Smartphone,
-  Plus,
-  Minus,
-  Crosshair,
-  Zap,
   Phone,
-  ArrowRight,
+  PhoneCall,
+  Search,
+  Smartphone,
+  UserRound,
+  X,
+  Zap,
 } from 'lucide-react';
-import { CityMap } from '@/components/map/CityMap';
 import {
-  RouteLine,
-  UnitMarker,
-  RequestPin,
-  DestPin,
-} from '@/components/map/MapMarkers';
-import {
-  Button,
-  IconButton,
-  Chip,
   Avatar,
-  Stat,
-  Stars,
+  Button,
+  Chip,
+  Empty,
+  IconButton,
   Legs,
   Plate,
-  UnitBadge,
   Segmented,
-  Empty,
+  Stat,
+  Synthetic,
+  UnitBadge,
 } from '@/components/ui';
 import {
-  REQUESTS_INITIAL,
   DRIVERS,
+  findCustomerByPhone,
+  REQUESTS_INITIAL,
   UNITS,
   UNIT_POSITIONS,
-  CATEGORY_BY_ID,
-  formatPEN,
-  formatKm,
   formatClock,
-  fareBreakdown,
+  formatKm,
+  formatPEN,
   type PendingRequest,
 } from '@/data';
-import { routeBetween, seededPoint } from '@/lib/city';
+import { seededPoint } from '@/lib/city';
+import {
+  JULIACA_BOUNDS,
+  JULIACA_CENTER,
+  geoDistanceKm,
+  geoToWorld,
+  isInsideJuliaca,
+  localPlace,
+  worldToGeo,
+  type GeoPoint,
+  type PlaceResult,
+} from '@/lib/juliaca';
+import type { MapFocus } from './JuliacaMap';
+import { useRoadRoute } from '@/hooks/useRoadRoute';
+import {
+  OFFER_SECONDS,
+  advanceDispatchCandidate,
+  createDispatchJob,
+  startDispatchCascade,
+  subscribeDispatchJobs,
+  type DispatchJob,
+} from '@/lib/dispatch';
 import s from './Operadora.module.css';
 
-const MAP_VIEW = '40 60 1520 1080';
+const JuliacaMap = dynamic(
+  () => import('./JuliacaMap').then((module) => module.JuliacaMap),
+  { ssr: false }
+);
 
-/** Unidad disponible más cercana a un punto — el KNN que corre en PostGIS. */
-function nearestUnit(p: { x: number; y: number }) {
-  let best: { id: string; d: number } | null = null;
-  for (const u of UNITS) {
-    if (u.status !== 'active') continue;
-    const q = UNIT_POSITIONS[u.id];
-    const d = Math.hypot(q.x - p.x, q.y - p.y);
-    if (!best || d < best.d) best = { id: u.id, d };
+type QueueFilter = 'all' | 'pending' | 'assigned';
+type PickingMode = 'new-pickup' | 'new-destination' | 'selected' | null;
+type PaymentMethod = PendingRequest['paymentMethod'];
+type SearchField = 'pickup' | 'destination';
+
+const NEW_PICKUP = seededPoint(801);
+
+const INITIAL_DRAFT = {
+  passengerName: '',
+  passengerPhone: '',
+  pickupAddress: '',
+  destinationAddress: '',
+  fare: '10.00',
+  paymentMethod: 'efectivo' as PaymentMethod,
+  unitId: '',
+  pickup: NEW_PICKUP,
+  pickupGeo: worldToGeo(NEW_PICKUP),
+  destinationGeo: null as GeoPoint | null,
+  pickupConfirmed: false,
+  destinationConfirmed: false,
+};
+
+function initials(name: string) {
+  return (
+    name
+      .trim()
+      .split(/\s+/)
+      .slice(0, 2)
+      .map((part) => part[0]?.toUpperCase())
+      .join('') || 'CL'
+  );
+}
+
+/** Unidad activa, libre en la cola y más cercana al recojo. */
+function nearestUnit(point: GeoPoint, requests: PendingRequest[], jobs: DispatchJob[]) {
+  const busyIds = new Set(
+    requests
+      .filter((request) => {
+        const job = jobs.find((item) => item.id === request.id);
+        return !job || !['finalizado', 'cancelado'].includes(job.status);
+      })
+      .map((request) => request.assignedUnitId)
+      .filter(Boolean)
+  );
+  let best: { id: string; distance: number } | null = null;
+
+  for (const unit of UNITS) {
+    if (unit.status !== 'active' || busyIds.has(unit.id)) continue;
+    const distance = geoDistanceKm(worldToGeo(UNIT_POSITIONS[unit.id]), point);
+    if (!best || distance < best.distance) best = { id: unit.id, distance };
   }
   return best;
 }
-
-/** 1 unidad de mundo ≈ 7 m en esta ciudad sintética. */
-const toKm = (worldDistance: number) => (worldDistance * 7) / 1000;
-
-const SEEDS = [
-  { name: 'Roxana Pari', seed: 'RP', from: 'Jr. Moquegua 412', to: 'Urb. Los Olivos' },
-  { name: 'Andrés Mamani', seed: 'AM', from: 'Av. El Sol 1050', to: 'Jr. Puno 230' },
-  { name: 'Camila Quispe', seed: 'CQ', from: 'Calle 2 de Mayo 88', to: 'Mercado San José' },
-];
 
 export function DispatcherView() {
   const [requests, setRequests] = useState<PendingRequest[]>(REQUESTS_INITIAL);
   const [selectedId, setSelectedId] = useState<string | null>(
     REQUESTS_INITIAL[0].id
   );
-  const [filter, setFilter] = useState<'all' | 'app' | 'telefono'>('all');
+  const [filter, setFilter] = useState<QueueFilter>('all');
   const [tick, setTick] = useState(0);
+  const [nowMs, setNowMs] = useState<number | null>(null);
+  const [intakeOpen, setIntakeOpen] = useState(false);
+  const [draft, setDraft] = useState(INITIAL_DRAFT);
+  const [picking, setPicking] = useState<PickingMode>(null);
+  const [mapCenter, setMapCenter] = useState<GeoPoint>(JULIACA_CENTER);
+  const [mapFocus, setMapFocus] = useState<MapFocus>({
+    point: JULIACA_CENTER,
+    zoom: 14,
+    key: 0,
+  });
+  const [searching, setSearching] = useState<SearchField | null>(null);
+  const [searchMessage, setSearchMessage] = useState('');
+  const [customerMessage, setCustomerMessage] = useState('');
+  const [jobs, setJobs] = useState<DispatchJob[]>([]);
+
+  useEffect(() => subscribeDispatchJobs(setJobs), []);
 
   useEffect(() => {
-    const id = setInterval(() => setTick((t) => t + 1), 1000);
-    return () => clearInterval(id);
-  }, []);
-
-  /* Llega una solicitud nueva cada ~28 s: la cola se mueve sola. */
-  useEffect(() => {
-    let n = 0;
+    setNowMs(Date.now());
     const id = setInterval(() => {
-      n += 1;
-      const seed = SEEDS[n % SEEDS.length];
-      const pickup = seededPoint(400 + n * 13);
-      const next: PendingRequest = {
-        id: String(1048 + n),
-        passengerName: seed.name,
-        passengerRating: 4.7,
-        passengerSeed: seed.seed,
-        pickupAddress: seed.from,
-        destinationAddress: seed.to,
-        pickup,
-        destination: seededPoint(500 + n * 17),
-        distanceKm: 2 + (n % 4),
-        categoryId: 'SEDAN',
-        fareEstimate: fareBreakdown(pickup, CATEGORY_BY_ID.SEDAN).total,
-        waitSeconds: 0,
-        source: n % 2 === 0 ? 'app' : 'telefono',
-        assignedUnitId: null,
-      };
-      setRequests((rs) => [next, ...rs].slice(0, 9));
-    }, 28000);
+      setTick((value) => value + 1);
+      setNowMs(Date.now());
+    }, 1000);
     return () => clearInterval(id);
   }, []);
 
-  const filtered = useMemo(
-    () => (filter === 'all' ? requests : requests.filter((r) => r.source === filter)),
-    [filter, requests]
-  );
+  const filtered = useMemo(() => {
+    if (filter === 'pending')
+      return requests.filter((item) => !item.assignedUnitId);
+    if (filter === 'assigned')
+      return requests.filter((item) => item.assignedUnitId);
+    return requests;
+  }, [filter, requests]);
 
-  const selected = requests.find((r) => r.id === selectedId) ?? null;
-
-  const assignedUnit = selected?.assignedUnitId
-    ? (UNITS.find((u) => u.id === selected.assignedUnitId) ?? null)
+  const selected = requests.find((item) => item.id === selectedId) ?? null;
+  const selectedJob = jobs.find((job) => job.id === selectedId) ?? null;
+  const effectiveAssignedId = selectedJob?.assignedUnitId ?? selected?.assignedUnitId;
+  const assignedUnit = effectiveAssignedId
+    ? UNITS.find((unit) => unit.id === effectiveAssignedId) ?? null
     : null;
   const assignedDriver = assignedUnit
-    ? (DRIVERS.find((d) => d.id === assignedUnit.driverId) ?? null)
+    ? DRIVERS.find((driver) => driver.id === assignedUnit.driverId) ?? null
     : null;
-
-  const suggestion = selected && !assignedUnit ? nearestUnit(selected.pickup) : null;
+  const selectedPickupGeo = selected
+    ? selected.pickupGeo ?? worldToGeo(selected.pickup)
+    : null;
+  const suggestion =
+    selected && selectedPickupGeo && !assignedUnit
+      ? nearestUnit(selectedPickupGeo, requests, jobs)
+      : null;
   const suggestedUnit = suggestion
-    ? (UNITS.find((u) => u.id === suggestion.id) ?? null)
+    ? UNITS.find((unit) => unit.id === suggestion.id) ?? null
     : null;
   const suggestedDriver = suggestedUnit
-    ? (DRIVERS.find((d) => d.id === suggestedUnit.driverId) ?? null)
+    ? DRIVERS.find((driver) => driver.id === suggestedUnit.driverId) ?? null
     : null;
+  const activeUnitId = assignedUnit?.id ?? selectedJob?.offer?.unitId ?? suggestedUnit?.id ?? null;
+  const selectedDestinationGeo = selected
+    ? selected.destinationGeo ?? worldToGeo(selected.destination)
+    : null;
+  const activeUnitGeo = activeUnitId ? worldToGeo(UNIT_POSITIONS[activeUnitId]) : null;
+  const pickupRoute = useRoadRoute(activeUnitGeo, selectedPickupGeo);
+  const serviceRoute = useRoadRoute(selectedPickupGeo, selectedDestinationGeo);
 
-  const activeUnitId = assignedUnit?.id ?? suggestedUnit?.id ?? null;
-  const routeToPickup =
-    selected && activeUnitId
-      ? routeBetween(UNIT_POSITIONS[activeUnitId], selected.pickup, 4)
-      : null;
+  useEffect(() => {
+    if (!selectedJob?.assignedUnitId) return;
+    setRequests((items) => items.map((item) => item.id === selectedJob.id ? { ...item, assignedUnitId: selectedJob.assignedUnitId } : item));
+  }, [selectedJob?.assignedUnitId, selectedJob?.id]);
 
-  const assign = () => {
-    if (!selected || !suggestedUnit) return;
-    setRequests((rs) =>
-      rs.map((r) =>
-        r.id === selected.id ? { ...r, assignedUnitId: suggestedUnit.id } : r
+  useEffect(() => {
+    if (selectedJob?.status !== 'ofertando' || !selectedJob.offer) return;
+    if (nowMs !== null && selectedJob.offer.expiresAt <= nowMs) advanceDispatchCandidate(selectedJob.id, 'vencida');
+  }, [selectedJob, nowMs]);
+
+  const availableUnits = UNITS.filter(
+    (unit) =>
+      unit.status === 'active' &&
+      !requests.some(
+        (request) =>
+          request.assignedUnitId === unit.id && request.id !== selectedId
+      )
+  );
+
+  const updateSelected = (change: Partial<PendingRequest>) => {
+    if (!selectedId) return;
+    setRequests((items) =>
+      items.map((item) =>
+        item.id === selectedId ? { ...item, ...change } : item
       )
     );
   };
 
-  const fare = selected
-    ? fareBreakdown(selected.pickup, CATEGORY_BY_ID[selected.categoryId])
-    : null;
+  const assign = () => {
+    if (!selectedJob || !suggestedUnit) return;
+    startDispatchCascade(selectedJob.id, suggestedUnit.id);
+  };
+
+  const focusMap = (point: GeoPoint, zoom = 17) => {
+    setMapCenter(point);
+    setMapFocus((current) => ({ point, zoom, key: current.key + 1 }));
+  };
+
+  const lookupCustomer = () => {
+    const phone = draft.passengerPhone.replace(/\D/g, '');
+    if (phone.length < 9) {
+      setCustomerMessage('Ingresa los 9 dígitos para consultar el padrón.');
+      return;
+    }
+    const customer = findCustomerByPhone(phone);
+    if (!customer) {
+      setCustomerMessage('Cliente nuevo · completa su nombre para registrarlo.');
+      return;
+    }
+    setDraft((current) => ({
+      ...current,
+      passengerName: customer.name,
+      pickupAddress: current.pickupAddress || customer.usualReference,
+    }));
+    setCustomerMessage(
+      `Cliente registrado · ${customer.trips} servicios anteriores.`
+    );
+  };
+
+  const resolvePlace = async (query: string): Promise<PlaceResult | null> => {
+    const local = localPlace(query);
+    if (local) return local;
+
+    const params = new URLSearchParams({
+      format: 'jsonv2',
+      limit: '1',
+      countrycodes: 'pe',
+      bounded: '1',
+      viewbox: [
+        JULIACA_BOUNDS.west,
+        JULIACA_BOUNDS.north,
+        JULIACA_BOUNDS.east,
+        JULIACA_BOUNDS.south,
+      ].join(','),
+      q: `${query}, Juliaca, Puno, Perú`,
+    });
+    const geocoder = (process.env.NEXT_PUBLIC_GEOCODER_URL || 'https://nominatim.openstreetmap.org').replace(/\/$/, '');
+    const response = await fetch(
+      `${geocoder}/search?${params.toString()}`,
+      { headers: { 'Accept-Language': 'es-PE,es' } }
+    );
+    if (!response.ok) throw new Error('No se pudo consultar el mapa.');
+    const results = (await response.json()) as Array<{
+      lat: string;
+      lon: string;
+      display_name: string;
+    }>;
+    const first = results[0];
+    if (!first) return null;
+    const point = { lat: Number(first.lat), lng: Number(first.lon) };
+    if (!isInsideJuliaca(point)) return null;
+    const parts = first.display_name.split(',').map((part) => part.trim());
+    return {
+      label: parts.slice(0, 2).join(', '),
+      detail: parts.slice(2, 5).join(', '),
+      point,
+    };
+  };
+
+  const applyPlace = (field: SearchField, place: PlaceResult) => {
+    setDraft((current) => ({
+      ...current,
+      ...(field === 'pickup'
+        ? {
+            pickupAddress: place.label,
+            pickupGeo: place.point,
+            pickup: geoToWorld(place.point),
+            pickupConfirmed: false,
+          }
+        : {
+            destinationAddress: place.label,
+            destinationGeo: place.point,
+            destinationConfirmed: false,
+          }),
+    }));
+    setPicking(field === 'pickup' ? 'new-pickup' : 'new-destination');
+    setSearchMessage(`${place.label} · ajusta el pin y confirma.`);
+    focusMap(place.point);
+  };
+
+  const searchPlace = async (field: SearchField) => {
+    const query =
+      field === 'pickup' ? draft.pickupAddress : draft.destinationAddress;
+    if (!query.trim()) {
+      setSearchMessage('Escribe una dirección o referencia de Juliaca.');
+      return;
+    }
+    setSearching(field);
+    setSearchMessage('Buscando dentro de Juliaca…');
+    try {
+      const place = await resolvePlace(query);
+      if (!place) {
+        setSearchMessage('No encontramos esa referencia dentro de Juliaca.');
+        return;
+      }
+      applyPlace(field, place);
+    } catch {
+      setSearchMessage(
+        'El mapa no respondió. Puedes ubicar el punto manualmente.'
+      );
+      setPicking(field === 'pickup' ? 'new-pickup' : 'new-destination');
+    } finally {
+      setSearching(null);
+    }
+  };
+
+  const startPicking = (mode: Exclude<PickingMode, null>) => {
+    const point =
+      mode === 'new-pickup'
+        ? draft.pickupGeo
+        : mode === 'new-destination'
+          ? draft.destinationGeo ?? JULIACA_CENTER
+          : selectedPickupGeo ?? JULIACA_CENTER;
+    focusMap(point);
+    setPicking(mode);
+    setSearchMessage('Mueve el mapa hasta el punto exacto y confirma.');
+  };
+
+  const confirmMapPoint = () => {
+    if (picking === 'new-pickup') {
+      setDraft((current) => ({
+        ...current,
+        pickup: geoToWorld(mapCenter),
+        pickupGeo: mapCenter,
+        pickupConfirmed: true,
+      }));
+    }
+    if (picking === 'new-destination') {
+      setDraft((current) => ({
+        ...current,
+        destinationGeo: mapCenter,
+        destinationConfirmed: true,
+      }));
+    }
+    if (picking === 'selected') {
+      updateSelected({ pickup: geoToWorld(mapCenter), pickupGeo: mapCenter });
+    }
+    setSearchMessage('Punto exacto confirmado.');
+    setPicking(null);
+  };
+
+  const registerCall = () => {
+    if (
+      !draft.passengerName.trim() ||
+      !draft.passengerPhone.trim() ||
+      !draft.pickupAddress.trim() ||
+      !draft.destinationAddress.trim() ||
+      !draft.pickupConfirmed ||
+      !draft.destinationGeo
+    ) {
+      setSearchMessage(
+        'Completa los datos y confirma el punto exacto de recojo y destino.'
+      );
+      return;
+    }
+
+    const nextNumber =
+      Math.max(...requests.map((request) => Number(request.id))) + 1;
+    const destinationGeo = draft.destinationGeo;
+    const destination = geoToWorld(destinationGeo);
+    const distanceKm = geoDistanceKm(draft.pickupGeo, destinationGeo) * 1.28;
+    const next: PendingRequest = {
+      id: String(nextNumber),
+      passengerName: draft.passengerName.trim(),
+      passengerPhone: draft.passengerPhone.trim(),
+      passengerRating: 0,
+      passengerSeed: initials(draft.passengerName),
+      pickupAddress: draft.pickupAddress.trim(),
+      destinationAddress: draft.destinationAddress.trim(),
+      pickup: draft.pickup,
+      destination,
+      pickupGeo: draft.pickupGeo,
+      destinationGeo,
+      distanceKm,
+      categoryId: 'SEDAN',
+      fareEstimate: Math.max(0, Number(draft.fare) || 0),
+      paymentMethod: draft.paymentMethod,
+      waitSeconds: 0,
+      createdAtTick: tick,
+      source: 'telefono',
+      assignedUnitId: draft.unitId || null,
+    };
+
+    setRequests((items) => [next, ...items]);
+    const busyIds = new Set(requests.filter((request) => {
+      const job = jobs.find((item) => item.id === request.id);
+      return !job || !['finalizado', 'cancelado'].includes(job.status);
+    }).map((request) => request.assignedUnitId).filter(Boolean));
+    const candidates = UNITS.filter((unit) => unit.status === 'active' && !busyIds.has(unit.id))
+      .sort((a, b) => geoDistanceKm(worldToGeo(UNIT_POSITIONS[a.id]), draft.pickupGeo) - geoDistanceKm(worldToGeo(UNIT_POSITIONS[b.id]), draft.pickupGeo))
+      .map((unit) => unit.id);
+    createDispatchJob({
+      id: next.id,
+      passengerName: next.passengerName,
+      passengerPhone: next.passengerPhone,
+      pickupAddress: next.pickupAddress,
+      destinationAddress: next.destinationAddress,
+      pickup: draft.pickupGeo,
+      destination: destinationGeo,
+      fare: next.fareEstimate,
+      paymentMethod: next.paymentMethod,
+      candidateUnitIds: candidates,
+    });
+    startDispatchCascade(next.id, draft.unitId || undefined);
+    setSelectedId(next.id);
+    setDraft(INITIAL_DRAFT);
+    setIntakeOpen(false);
+    setPicking(null);
+  };
 
   return (
     <div className={s.dispatcher}>
-      {/* ------------------------------------------------------- Cola --- */}
-      <aside className={`${s.col} ${s.colQueue}`} aria-label="Cola de solicitudes">
+      <aside className={`${s.col} ${s.colQueue}`} aria-label="Cola de llamadas">
         <div className={s.colHead}>
-          <div className={s.colTitle}>
-            Solicitudes
-            <Chip tone="brand">{requests.length}</Chip>
-          </div>
-          <div className={s.colSub}>
-            {requests.filter((r) => !r.assignedUnitId).length} sin asignar · en
-            vivo
+          <div className={s.queueHeadRow}>
+            <div>
+              <div className={s.colTitle}>
+                Llamadas
+                <Chip tone="brand">{requests.length}</Chip>
+              </div>
+              <div className={s.colSub}>
+                {requests.filter((item) => !item.assignedUnitId).length} por
+                asignar
+              </div>
+            </div>
+            <Button
+              size="sm"
+              onClick={() => {
+                setIntakeOpen((value) => !value);
+                setPicking(null);
+              }}
+            >
+              {intakeOpen ? <X size={15} /> : <PhoneCall size={15} />}
+              {intakeOpen ? 'Cerrar' : 'Nueva llamada'}
+            </Button>
           </div>
         </div>
 
-        <div className={s.colFilters}>
-          <Segmented
-            value={filter}
-            onChange={setFilter}
-            options={[
-              { value: 'all', label: 'Todas', count: requests.length },
-              {
-                value: 'app',
-                label: 'App',
-                count: requests.filter((r) => r.source === 'app').length,
-              },
-              {
-                value: 'telefono',
-                label: 'Teléfono',
-                count: requests.filter((r) => r.source === 'telefono').length,
-              },
-            ]}
-          />
-        </div>
+        {intakeOpen ? (
+          <div className={s.intake}>
+            <div className={s.intakeIntro}>
+              <span className={s.intakeIcon}>
+                <PhoneCall size={18} />
+              </span>
+              <span>
+                <strong>Registrar servicio</strong>
+                <small>Completa los datos mientras atiendes la llamada.</small>
+              </span>
+            </div>
 
-        <div className={s.colList}>
-          {filtered.length === 0 ? (
-            <Empty icon={<Zap size={20} />} title="Sin solicitudes en este canal">
-              Cambia de filtro o espera la próxima llamada.
-            </Empty>
-          ) : (
-            filtered.map((r) => {
-              const active = r.id === selectedId;
-              const wait = r.waitSeconds + tick;
-              const hot = wait > 100;
-              return (
+            <label className={s.formField}>
+              <span>Nombre del cliente</span>
+              <span className={s.inputWrap}>
+                <UserRound size={15} />
+                <input
+                  value={draft.passengerName}
+                  onChange={(event) =>
+                    setDraft((current) => ({
+                      ...current,
+                      passengerName: event.target.value,
+                    }))
+                  }
+                  placeholder="Ej. Julia Mamani"
+                />
+              </span>
+            </label>
+
+            <label className={s.formField}>
+              <span>Celular</span>
+              <span className={s.inputWrap}>
+                <Phone size={15} />
+                <input
+                  type="tel"
+                  value={draft.passengerPhone}
+                  onChange={(event) =>
+                    setDraft((current) => ({
+                      ...current,
+                      passengerPhone: event.target.value,
+                    }))
+                  }
+                  onBlur={lookupCustomer}
+                  placeholder="987 654 321"
+                />
                 <button
-                  key={r.id}
-                  className={`${s.qItem} ${active ? s.qActive : ''}`}
-                  onClick={() => setSelectedId(r.id)}
-                  aria-pressed={active}
+                  type="button"
+                  className={s.inputAction}
+                  onClick={lookupCustomer}
+                  aria-label="Consultar cliente por celular"
                 >
-                  <div className={s.qTop}>
-                    <span className={s.qId}>#{r.id}</span>
-                    {r.source === 'telefono' ? (
-                      <PhoneCall size={12} opacity={0.7} />
-                    ) : (
-                      <Smartphone size={12} opacity={0.7} />
-                    )}
-                    <span
-                      className={`${s.qWait} ${hot && !active ? s.qWaitHot : ''}`}
-                    >
-                      <Clock size={10} />
-                      {formatClock(wait)}
-                    </span>
-                  </div>
-
-                  <div className={s.qName}>{r.passengerName}</div>
-
-                  <div className={s.qRoute}>
-                    <MapPin size={11} />
-                    <span className={s.qRouteText}>{r.pickupAddress}</span>
-                  </div>
-                  <div className={s.qRoute}>
-                    <Navigation size={11} />
-                    <span className={s.qRouteText}>{r.destinationAddress}</span>
-                  </div>
-
-                  <div className={s.qFoot}>
-                    <span className={s.qFare}>{formatPEN(r.fareEstimate)}</span>
-                    {r.assignedUnitId ? (
-                      <span className={s.qAssign}>
-                        <UnitBadge
-                          n={
-                            UNITS.find((u) => u.id === r.assignedUnitId)?.n ?? '—'
-                          }
-                          size="sm"
-                        />
-                      </span>
-                    ) : (
-                      <span className={`${s.qAssign} ${s.qUnassigned}`}>
-                        Sin asignar
-                        <ArrowRight size={12} />
-                      </span>
-                    )}
-                  </div>
+                  <Search size={15} />
                 </button>
-              );
-            })
-          )}
-        </div>
+              </span>
+            </label>
+            {customerMessage && (
+              <div className={s.lookupStatus}>
+                <BadgeCheck size={14} /> {customerMessage}
+                <Synthetic>Padrón demo</Synthetic>
+              </div>
+            )}
+
+            <label className={s.formField}>
+              <span>Lugar de recojo</span>
+              <span className={s.inputWrap}>
+                <MapPin size={15} />
+                <input
+                  value={draft.pickupAddress}
+                  onChange={(event) =>
+                    setDraft((current) => ({
+                      ...current,
+                      pickupAddress: event.target.value,
+                    }))
+                  }
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter') void searchPlace('pickup');
+                  }}
+                  placeholder="Calle, número o referencia"
+                />
+                <button
+                  type="button"
+                  className={s.inputAction}
+                  onClick={() => void searchPlace('pickup')}
+                  aria-label="Buscar lugar de recojo en Juliaca"
+                >
+                  {searching === 'pickup' ? (
+                    <LoaderCircle className={s.spinning} size={15} />
+                  ) : (
+                    <Search size={15} />
+                  )}
+                </button>
+              </span>
+            </label>
+            <Button
+              variant={picking === 'new-pickup' ? 'primary' : 'outline'}
+              size="sm"
+              full
+              onClick={() => startPicking('new-pickup')}
+            >
+              <Crosshair size={15} />
+              {picking === 'new-pickup'
+                ? 'Mueve el mapa y confirma'
+                : draft.pickupConfirmed
+                  ? 'Recojo confirmado · corregir'
+                  : 'Marcar punto exacto de recojo'}
+            </Button>
+
+            <label className={s.formField}>
+              <span>Destino</span>
+              <span className={s.inputWrap}>
+                <Navigation size={15} />
+                <input
+                  value={draft.destinationAddress}
+                  onChange={(event) =>
+                    setDraft((current) => ({
+                      ...current,
+                      destinationAddress: event.target.value,
+                    }))
+                  }
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter') void searchPlace('destination');
+                  }}
+                  placeholder="Destino o referencia"
+                />
+                <button
+                  type="button"
+                  className={s.inputAction}
+                  onClick={() => void searchPlace('destination')}
+                  aria-label="Buscar destino en Juliaca"
+                >
+                  {searching === 'destination' ? (
+                    <LoaderCircle className={s.spinning} size={15} />
+                  ) : (
+                    <Search size={15} />
+                  )}
+                </button>
+              </span>
+            </label>
+            <Button
+              variant={picking === 'new-destination' ? 'primary' : 'outline'}
+              size="sm"
+              full
+              onClick={() => startPicking('new-destination')}
+            >
+              <Navigation size={15} />
+              {picking === 'new-destination'
+                ? 'Mueve el mapa y confirma'
+                : draft.destinationConfirmed
+                  ? 'Destino confirmado · corregir'
+                  : 'Ubicar destino en el mapa'}
+            </Button>
+
+            {searchMessage && (
+              <div className={s.mapFormStatus}>
+                <MapPin size={14} /> {searchMessage}
+              </div>
+            )}
+
+            <div className={s.formGrid}>
+              <label className={s.formField}>
+                <span>Precio acordado</span>
+                <span className={s.inputWrap}>
+                  <span className={s.currency}>S/</span>
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.50"
+                    value={draft.fare}
+                    onChange={(event) =>
+                      setDraft((current) => ({
+                        ...current,
+                        fare: event.target.value,
+                      }))
+                    }
+                  />
+                </span>
+              </label>
+              <label className={s.formField}>
+                <span>Unidad</span>
+                <select
+                  className={s.select}
+                  value={draft.unitId}
+                  onChange={(event) =>
+                    setDraft((current) => ({
+                      ...current,
+                      unitId: event.target.value,
+                    }))
+                  }
+                >
+                  <option value="">Asignar luego</option>
+                  {availableUnits.map((unit) => (
+                    <option key={unit.id} value={unit.id}>
+                      Unidad {unit.n} · {unit.placa}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </div>
+
+            <div className={s.formField}>
+              <span>Forma de pago</span>
+              <PaymentChoice
+                value={draft.paymentMethod}
+                onChange={(paymentMethod) =>
+                  setDraft((current) => ({ ...current, paymentMethod }))
+                }
+              />
+            </div>
+
+            <Button size="md" full onClick={registerCall}>
+              <Check size={16} /> Registrar servicio
+            </Button>
+          </div>
+        ) : (
+          <>
+            <div className={s.colFilters}>
+              <Segmented
+                value={filter}
+                onChange={setFilter}
+                options={[
+                  { value: 'all', label: 'Todas', count: requests.length },
+                  {
+                    value: 'pending',
+                    label: 'Por asignar',
+                    count: requests.filter((item) => !item.assignedUnitId)
+                      .length,
+                  },
+                  {
+                    value: 'assigned',
+                    label: 'Asignadas',
+                    count: requests.filter((item) => item.assignedUnitId).length,
+                  },
+                ]}
+              />
+            </div>
+
+            <div className={s.colList}>
+              {filtered.length === 0 ? (
+                <Empty
+                  icon={<PhoneCall size={20} />}
+                  title="Sin llamadas en esta vista"
+                >
+                  Registra una llamada o cambia el filtro.
+                </Empty>
+              ) : (
+                filtered.map((request) => {
+                  const active = request.id === selectedId;
+                  const wait =
+                    request.createdAtTick === undefined
+                      ? request.waitSeconds + tick
+                      : tick - request.createdAtTick;
+                  const hot = wait > 100;
+                  return (
+                    <button
+                      key={request.id}
+                      className={`${s.qItem} ${active ? s.qActive : ''}`}
+                      onClick={() => {
+                        setSelectedId(request.id);
+                        focusMap(
+                          request.pickupGeo ?? worldToGeo(request.pickup),
+                          16
+                        );
+                      }}
+                      aria-pressed={active}
+                    >
+                      <div className={s.qTop}>
+                        <span className={s.qId}>#{request.id}</span>
+                        <PhoneCall size={12} opacity={0.7} />
+                        <span
+                          className={`${s.qWait} ${
+                            hot && !active ? s.qWaitHot : ''
+                          }`}
+                        >
+                          <Clock size={10} /> {formatClock(wait)}
+                        </span>
+                      </div>
+                      <div className={s.qName}>{request.passengerName}</div>
+                      <div className={s.qPhone}>{request.passengerPhone}</div>
+                      <div className={s.qRoute}>
+                        <MapPin size={11} />
+                        <span className={s.qRouteText}>
+                          {request.pickupAddress}
+                        </span>
+                      </div>
+                      <div className={s.qRoute}>
+                        <Navigation size={11} />
+                        <span className={s.qRouteText}>
+                          {request.destinationAddress}
+                        </span>
+                      </div>
+                      <div className={s.qFoot}>
+                        <span className={s.qFare}>
+                          {formatPEN(request.fareEstimate)}
+                        </span>
+                        <span className={s.qPayment}>
+                          {request.paymentMethod === 'yape' ? (
+                            <Smartphone size={12} />
+                          ) : (
+                            <Banknote size={12} />
+                          )}
+                          {request.paymentMethod === 'yape'
+                            ? 'Yape'
+                            : 'Efectivo'}
+                        </span>
+                        {request.assignedUnitId ? (
+                          <span className={s.qAssign}>
+                            <UnitBadge
+                              n={
+                                UNITS.find(
+                                  (unit) =>
+                                    unit.id === request.assignedUnitId
+                                )?.n ?? '—'
+                              }
+                              size="sm"
+                            />
+                          </span>
+                        ) : (
+                          <span className={`${s.qAssign} ${s.qUnassigned}`}>
+                            Sin asignar <ArrowRight size={12} />
+                          </span>
+                        )}
+                      </div>
+                    </button>
+                  );
+                })
+              )}
+            </div>
+          </>
+        )}
       </aside>
 
-      {/* ------------------------------------------------------- Mapa --- */}
-      <section className={s.mapZone} aria-label="Mapa de la flota">
-        <CityMap viewBox={MAP_VIEW} rings>
-          {routeToPickup && <RouteLine d={routeToPickup} />}
-
-          {UNITS.map((u) => {
-            const p = UNIT_POSITIONS[u.id];
-            return (
-              <UnitMarker
-                key={u.id}
-                x={p.x}
-                y={p.y}
-                n={u.n}
-                status={u.status}
-                heading={u.heading}
-                selected={u.id === activeUnitId}
-              />
-            );
-          })}
-
-          {requests.map((r) => (
-            <RequestPin
-              key={r.id}
-              x={r.pickup.x}
-              y={r.pickup.y}
-              selected={r.id === selectedId}
-              hot={r.waitSeconds + tick > 100}
-            />
-          ))}
-
-          {selected && (
-            <DestPin x={selected.destination.x} y={selected.destination.y} />
-          )}
-        </CityMap>
+      <section className={s.mapZone} aria-label="Mapa interactivo de Juliaca">
+        <JuliacaMap
+          units={UNITS}
+          unitPositions={UNIT_POSITIONS}
+          requests={requests}
+          selectedId={selectedId}
+          activeUnitId={activeUnitId}
+          picking={Boolean(picking)}
+          focus={mapFocus}
+          onCenterChange={setMapCenter}
+          onSelectRequest={(id) => {
+            setSelectedId(id);
+            const request = requests.find((item) => item.id === id);
+            if (request) {
+              focusMap(request.pickupGeo ?? worldToGeo(request.pickup), 16);
+            }
+          }}
+          pickupRoute={pickupRoute.route?.points ?? []}
+          serviceRoute={serviceRoute.route?.points ?? []}
+        />
 
         <div className={s.mapOverlayTop}>
           <span className={s.mapChip}>
-            <span
-              style={{
-                width: 7,
-                height: 7,
-                borderRadius: 99,
-                background: 'var(--success)',
-              }}
-            />
-            Flota en vivo · {UNITS.length} unidades
+            <span className={s.mapLiveDot} />
+            Juliaca · {UNITS.length} unidades monitoreadas
           </span>
-          <span className={s.mapChip}>Anillos tarifarios visibles</span>
+          <span className={s.mapChip}>
+            {selected
+              ? serviceRoute.route
+                ? `${formatKm(serviceRoute.route.distanceMeters / 1000)} · ${Math.max(1, Math.ceil(serviceRoute.route.durationSeconds / 60))} min por calles`
+                : serviceRoute.loading ? 'Calculando ruta vial…' : 'Ruta temporalmente no disponible'
+              : 'Arrastra el mapa y usa la rueda para acercar'}
+          </span>
         </div>
+
+        {picking && (
+          <div className={s.operatorPicker}>
+            <span className={s.operatorPickerLabel}>
+              {picking === 'new-destination' ? 'Destino exacto' : 'Recojo exacto'}
+              <small>
+                {mapCenter.lat.toFixed(5)}, {mapCenter.lng.toFixed(5)}
+              </small>
+            </span>
+            <span className={s.operatorPickerPin}>
+              <MapPin size={25} />
+            </span>
+            <Button size="sm" onClick={confirmMapPoint}>
+              <Check size={14} /> Confirmar punto exacto
+            </Button>
+          </div>
+        )}
 
         <div className={s.mapLegend}>
-          {[
-            ['var(--success)', 'Disponible'],
-            ['var(--brand-500)', 'En viaje'],
-            ['#4A4360', 'Sin conexión'],
-            ['var(--danger)', 'Bloqueada'],
-          ].map(([color, label]) => (
-            <span key={label} className={s.legendItem}>
-              <span
-                className={s.legendSwatch}
-                style={{ background: color }}
-              />
-              {label}
-            </span>
-          ))}
-        </div>
-
-        <div className={s.mapTools}>
-          <IconButton variant="glass" size="sm" aria-label="Acercar">
-            <Plus size={16} />
-          </IconButton>
-          <IconButton variant="glass" size="sm" aria-label="Alejar">
-            <Minus size={16} />
-          </IconButton>
-          <IconButton variant="glass" size="sm" aria-label="Centrar en la plaza">
-            <Crosshair size={16} />
-          </IconButton>
+          <Legend tone="success">Disponible</Legend>
+          <Legend tone="brand">En viaje</Legend>
+          <Legend tone="offline">Sin conexión</Legend>
+          <Legend tone="danger">Bloqueada</Legend>
         </div>
       </section>
 
-      {/* ----------------------------------------------------- Detalle --- */}
-      <aside className={`${s.col} ${s.colDetail}`} aria-label="Detalle de la solicitud">
-        {!selected || !fare ? (
-          <Empty icon={<MapPin size={20} />} title="Ninguna solicitud seleccionada">
-            Elige una de la cola para ver al pasajero, la tarifa y la unidad
-            sugerida.
+      <aside
+        className={`${s.col} ${s.colDetail}`}
+        aria-label="Detalle del servicio"
+      >
+        {!selected ? (
+          <Empty
+            icon={<PhoneCall size={20} />}
+            title="Ninguna llamada seleccionada"
+          >
+            Selecciona un servicio o registra una nueva llamada.
           </Empty>
         ) : (
           <>
             <div className={s.colHead}>
               <div className={s.colTitle}>{selected.passengerName}</div>
               <div className={s.colSub}>
-                #{selected.id} ·{' '}
-                {selected.source === 'telefono'
-                  ? 'entró por teléfono'
-                  : 'entró por la app'}
+                #{selected.id} · llamada telefónica
               </div>
             </div>
 
@@ -360,9 +895,9 @@ export function DispatcherView() {
               <div className={s.kpiPair}>
                 <div className={s.kpiBox}>
                   <Stat
-                    label="Tarifa"
-                    value={formatPEN(fare.total)}
-                    sub={fare.lines[0].label}
+                    label="Precio acordado"
+                    value={formatPEN(selected.fareEstimate)}
+                    sub="Editable"
                     size="sm"
                   />
                 </div>
@@ -370,7 +905,7 @@ export function DispatcherView() {
                   <Stat
                     label="Distancia"
                     value={formatKm(selected.distanceKm)}
-                    sub={CATEGORY_BY_ID[selected.categoryId].label}
+                    sub="Estimación"
                     size="sm"
                   />
                 </div>
@@ -382,10 +917,21 @@ export function DispatcherView() {
                   from={selected.pickupAddress}
                   to={selected.destinationAddress}
                 />
+                <Button
+                  variant={picking === 'selected' ? 'primary' : 'outline'}
+                  size="sm"
+                  full
+                  onClick={() => startPicking('selected')}
+                >
+                  <Crosshair size={15} />
+                  {picking === 'selected'
+                    ? 'Mueve el mapa y confirma'
+                    : 'Corregir recojo en mapa'}
+                </Button>
               </div>
 
               <div className={s.detailSection}>
-                <span className={s.sectionLabel}>Pasajero</span>
+                <span className={s.sectionLabel}>Cliente</span>
                 <div className={s.assignedTop}>
                   <Avatar initials={selected.passengerSeed} size={38} />
                   <div className={s.suggestionBody}>
@@ -393,22 +939,61 @@ export function DispatcherView() {
                       {selected.passengerName}
                     </div>
                     <div className={s.suggestionMeta}>
-                      <Stars value={selected.passengerRating} />
+                      {selected.passengerPhone}
                     </div>
                   </div>
                   <IconButton
                     variant="neutral"
                     size="sm"
-                    aria-label="Llamar al pasajero"
+                    aria-label="Llamar al cliente"
                   >
                     <Phone size={15} />
                   </IconButton>
                 </div>
               </div>
 
-              {assignedUnit && assignedDriver ? (
-                <div className={s.detailSection}>
-                  <span className={s.sectionLabel}>Unidad asignada</span>
+              <div className={s.detailSection}>
+                <span className={s.sectionLabel}>Cobro</span>
+                <label className={s.formField}>
+                  <span>Precio final</span>
+                  <span className={s.inputWrap}>
+                    <span className={s.currency}>S/</span>
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.50"
+                      value={selected.fareEstimate}
+                      onChange={(event) =>
+                        updateSelected({
+                          fareEstimate: Math.max(
+                            0,
+                            Number(event.target.value) || 0
+                          ),
+                        })
+                      }
+                    />
+                  </span>
+                </label>
+                <PaymentChoice
+                  value={selected.paymentMethod}
+                  onChange={(paymentMethod) =>
+                    updateSelected({ paymentMethod })
+                  }
+                />
+              </div>
+
+              <div className={s.detailSection}>
+                <span className={s.sectionLabel}>Unidad</span>
+                {selectedJob?.status === 'ofertando' && selectedJob.offer && (
+                  <div className={s.suggestion}>
+                    <Clock size={20} />
+                    <div className={s.suggestionBody}>
+                      <div className={s.suggestionName}>Ofertando a Unidad {UNITS.find((unit) => unit.id === selectedJob.offer?.unitId)?.n}</div>
+                      <div className={s.suggestionMeta}>Intento {selectedJob.offer.attempt} · {Math.max(0, Math.ceil((selectedJob.offer.expiresAt - (nowMs ?? selectedJob.offer.expiresAt)) / 1000))} s para responder</div>
+                    </div>
+                  </div>
+                )}
+                {assignedUnit && assignedDriver ? (
                   <div className={s.assignedCard}>
                     <div className={s.assignedTop}>
                       <UnitBadge n={assignedUnit.n} size="md" />
@@ -422,69 +1007,99 @@ export function DispatcherView() {
                       </div>
                       <Plate value={assignedUnit.placa} />
                     </div>
-                    <div className={s.assignedActions}>
-                      <Button variant="outline" size="sm">
-                        <Phone size={14} />
-                        Llamar
-                      </Button>
-                      <Button variant="outline" size="sm">
-                        Reasignar
-                      </Button>
-                    </div>
+                    <label className={s.formField}>
+                      <span>Cambiar unidad</span>
+                      <select
+                        className={s.select}
+                        value={assignedUnit.id}
+                        onChange={(event) =>
+                          updateSelected({
+                            assignedUnitId: event.target.value || null,
+                          })
+                        }
+                      >
+                        <option value="">Sin asignar</option>
+                        {availableUnits.map((unit) => (
+                          <option key={unit.id} value={unit.id}>
+                            Unidad {unit.n} · {unit.placa}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
                   </div>
-                </div>
-              ) : (
-                <div className={s.detailSection}>
-                  <span className={s.sectionLabel}>Asignación sugerida</span>
-                  {suggestedUnit && suggestedDriver && suggestion ? (
-                    <>
-                      <div className={s.suggestion}>
-                        <UnitBadge n={suggestedUnit.n} size="md" />
-                        <div className={s.suggestionBody}>
-                          <div className={s.suggestionName}>
-                            {suggestedDriver.name}
-                          </div>
-                          <div className={s.suggestionMeta}>
-                            a {formatKm(toKm(suggestion.d))} · la más cercana
-                            disponible
-                          </div>
+                ) : suggestedUnit && suggestedDriver && suggestion ? (
+                  <>
+                    <div className={s.suggestion}>
+                      <UnitBadge n={suggestedUnit.n} size="md" />
+                      <div className={s.suggestionBody}>
+                        <div className={s.suggestionName}>
+                          {suggestedDriver.name}
+                        </div>
+                        <div className={s.suggestionMeta}>
+                          a {formatKm(suggestion.distance)} · aprox.{' '}
+                          {Math.max(2, Math.ceil(suggestion.distance * 3.2))} min
                         </div>
                       </div>
-                      <Button size="md" full onClick={assign}>
-                        <Zap size={16} />
-                        Proponer a Unidad {suggestedUnit.n}
-                      </Button>
-                    </>
-                  ) : (
-                    <Empty
-                      icon={<Zap size={18} />}
-                      title="Sin unidades disponibles"
-                    >
-                      Toda la flota está ocupada o fuera de línea.
-                    </Empty>
-                  )}
-                </div>
-              )}
-
-              <div className={s.detailSection}>
-                <span className={s.sectionLabel}>Desglose de tarifa</span>
-                <div className={s.fareCard}>
-                  {fare.lines.map((l) => (
-                    <div key={l.concepto} className={s.fareRow}>
-                      <span>{l.label}</span>
-                      <span>{formatPEN(l.amount)}</span>
                     </div>
-                  ))}
-                  <div className={`${s.fareRow} ${s.fareTotal}`}>
-                    <span>Total a cobrar</span>
-                    <span>{formatPEN(fare.total)}</span>
-                  </div>
-                </div>
+                    <Button size="md" full onClick={assign} disabled={selectedJob?.status === 'ofertando'}>
+                      <Zap size={16} /> {selectedJob?.status === 'ofertando' ? `Esperando respuesta · ${OFFER_SECONDS} s` : 'Buscar taxi cercano'}
+                    </Button>
+                  </>
+                ) : (
+                  <Empty
+                    icon={<Zap size={18} />}
+                    title="Sin unidades disponibles"
+                  >
+                    Toda la flota está ocupada o fuera de línea.
+                  </Empty>
+                )}
               </div>
             </div>
           </>
         )}
       </aside>
     </div>
+  );
+}
+
+function PaymentChoice({
+  value,
+  onChange,
+}: {
+  value: PaymentMethod;
+  onChange: (value: PaymentMethod) => void;
+}) {
+  return (
+    <div className={s.paymentChoice}>
+      <button
+        className={value === 'efectivo' ? s.paymentActive : ''}
+        onClick={() => onChange('efectivo')}
+        aria-pressed={value === 'efectivo'}
+      >
+        <Banknote size={16} /> Efectivo
+      </button>
+      <button
+        className={value === 'yape' ? s.paymentActive : ''}
+        onClick={() => onChange('yape')}
+        aria-pressed={value === 'yape'}
+      >
+        <Smartphone size={16} /> Yape
+      </button>
+    </div>
+  );
+}
+
+function Legend({
+  tone,
+  children,
+}: {
+  tone: 'success' | 'brand' | 'offline' | 'danger';
+  children: string;
+}) {
+  return (
+    <span className={s.legendItem}>
+      <span className={`${s.legendSwatch} ${s[`legend${tone}`]}`} />
+      {children}
+    </span>
   );
 }

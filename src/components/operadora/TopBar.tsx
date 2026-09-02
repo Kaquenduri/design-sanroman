@@ -55,7 +55,7 @@ export function TopBar() {
       </div>
 
       <Chip tone="success" dot live>
-        Asignación automática activa
+        Despacho telefónico activo
       </Chip>
 
       <div className={s.topMetrics}>

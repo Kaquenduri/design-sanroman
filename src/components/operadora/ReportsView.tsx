@@ -83,7 +83,7 @@ export function ReportsView() {
           <Stat
             label=""
             value={formatPEN(dayRevenue)}
-            sub="100% en efectivo"
+            sub="Cobros en efectivo y Yape"
           />
         </div>
         <div className={s.kpiCard}>
