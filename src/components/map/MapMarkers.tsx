@@ -1,5 +1,7 @@
 import type { UnitStatus } from '@/data';
 
+const VEHICLE_ICON = `${process.env.NEXT_PUBLIC_BASE_PATH ?? ''}/icono_carro_1.svg`;
+
 /* Marcadores en coordenadas de mundo, compartidos por las tres superficies.
    Se dibujan dentro de <CityMap>, después del mapa base.
 
@@ -9,10 +11,10 @@ import type { UnitStatus } from '@/data';
    pantalla en el móvil. Cada superficie pasa el suyo. */
 
 const STATUS_FILL: Record<UnitStatus, string> = {
-  active: '#22C55E',
-  'on-trip': '#8B5CF6',
-  offline: '#4A4360',
-  blocked: '#EF4444',
+  active: 'var(--success)',
+  'on-trip': 'var(--brand-500)',
+  offline: 'var(--fg-faint)',
+  blocked: 'var(--danger)',
 };
 
 /**
@@ -113,8 +115,8 @@ export function DestPin({
 }
 
 /**
- * Unidad en el mapa. El numeral pintado de la puerta es el objeto — no un
- * punto de color anónimo: así se lee la flota igual que se lee la calle.
+ * Unidad en el mapa. La silueta entregada por el equipo sustituye al bloque
+ * abstracto; el numeral permanece como matrícula operativa de la central.
  */
 export function UnitMarker({
   x,
@@ -134,7 +136,6 @@ export function UnitMarker({
   k?: number;
 }) {
   const fill = STATUS_FILL[status];
-  const dark = status === 'offline';
   return (
     <g transform={`translate(${x} ${y}) scale(${k})`}>
       {selected && (
@@ -146,36 +147,39 @@ export function UnitMarker({
       {status === 'active' && !selected && (
         <circle r="30" fill={fill} opacity="0.14" />
       )}
-      {/* Cuña de rumbo: hacia dónde apunta la unidad */}
-      {status !== 'offline' && (
-        <path
-          d="M 0 -30 L 8 -19 L -8 -19 Z"
-          fill={fill}
-          transform={`rotate(${heading})`}
-          opacity="0.9"
+      <g transform={`rotate(${heading})`} pointerEvents="none">
+        <circle r="27" fill="var(--glass-strong)" stroke={fill} strokeWidth="3" />
+        <image
+          href={VEHICLE_ICON}
+          x="-24"
+          y="-24"
+          width="48"
+          height="48"
+          preserveAspectRatio="xMidYMid meet"
         />
-      )}
-      <rect
-        x="-19"
-        y="-14"
-        width="38"
-        height="28"
-        rx="7"
-        fill={fill}
-        stroke="#08070C"
-        strokeWidth="3"
-      />
-      <text
-        y="7"
-        fontSize="18"
-        fontWeight="800"
-        textAnchor="middle"
-        fill={dark ? '#B9B2CC' : '#0B0A10'}
-        letterSpacing="-0.4"
-        style={{ pointerEvents: 'none' }}
-      >
-        {n}
-      </text>
+      </g>
+      <g transform="translate(0 26)" pointerEvents="none">
+        <rect
+          x="-14"
+          y="-8"
+          width="28"
+          height="16"
+          rx="8"
+          fill="var(--glass-strong)"
+          stroke={fill}
+          strokeWidth="2"
+        />
+        <text
+          y="4.5"
+          fontSize="11"
+          fontWeight="800"
+          textAnchor="middle"
+          fill="var(--fg)"
+          letterSpacing="-0.2"
+        >
+          {n}
+        </text>
+      </g>
     </g>
   );
 }

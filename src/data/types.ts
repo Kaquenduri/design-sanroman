@@ -4,6 +4,7 @@
 // mockup y el modelo de datos hablen el mismo idioma.
 
 import type { WorldPoint } from '@/lib/city';
+import type { GeoPoint } from '@/lib/juliaca';
 
 export type Driver = {
   id: string;
@@ -61,18 +62,25 @@ export type Membership = {
 export type PendingRequest = {
   id: string;
   passengerName: string;
+  passengerPhone: string;
   passengerRating: number;
   passengerSeed: string;
   pickupAddress: string;
   destinationAddress: string;
   pickup: WorldPoint;
   destination: WorldPoint;
+  /** Coordenadas reales usadas por el panel cartográfico de la operadora. */
+  pickupGeo?: GeoPoint;
+  destinationGeo?: GeoPoint;
   distanceKm: number;
   categoryId: CategoryId;
   fareEstimate: number;
+  paymentMethod: 'efectivo' | 'yape';
   waitSeconds: number;
-  /** `app` = solicitud directa del pasajero; `telefono` = puente de la central. */
-  source: 'app' | 'telefono';
+  /** Segundo relativo en que entró una llamada creada durante esta sesión. */
+  createdAtTick?: number;
+  /** En la primera versión todos los servicios entran por llamada. */
+  source: 'telefono';
   assignedUnitId: string | null;
 };
 

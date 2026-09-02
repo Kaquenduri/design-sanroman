@@ -8,6 +8,9 @@ const repo = 'design-sanroman';
 
 const nextConfig = {
   reactStrictMode: true,
+  env: {
+    NEXT_PUBLIC_BASE_PATH: isPages ? `/${repo}` : '',
+  },
   ...(isPages
     ? {
         output: 'export',

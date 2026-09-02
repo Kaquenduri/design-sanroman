@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from 'next';
 import { Inter, Plus_Jakarta_Sans, JetBrains_Mono } from 'next/font/google';
 import './globals.css';
+import 'leaflet/dist/leaflet.css';
 
 const inter = Inter({
   subsets: ['latin'],
@@ -25,7 +26,7 @@ const jetbrains = JetBrains_Mono({
 export const metadata: Metadata = {
   title: 'Taxi Real San Román · Sistema de Despacho',
   description:
-    'Despacho digital para Taxi Real San Román — Juliaca, Puno. App del conductor, app del cliente y panel de la operadora.',
+    'Despacho telefónico para Taxi Real San Román — mapa de Juliaca, asignación de unidades y app del conductor.',
 };
 
 export const viewport: Viewport = {

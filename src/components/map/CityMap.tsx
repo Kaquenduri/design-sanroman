@@ -339,8 +339,10 @@ export function CityMap({
             // Diagonal inferior derecha: es el cuadrante que queda dentro del
             // recorte en los tres encuadres, a diferencia del izquierdo.
             const rad = (55 * Math.PI) / 180;
-            const x = PLAZA.x + Math.cos(rad) * a.r;
-            const y = PLAZA.y + Math.sin(rad) * a.r;
+            // El redondeo estabiliza el atributo SVG entre el motor de Node y
+            // el navegador; el último decimal no tiene efecto visual.
+            const x = Math.round((PLAZA.x + Math.cos(rad) * a.r) * 1000) / 1000;
+            const y = Math.round((PLAZA.y + Math.sin(rad) * a.r) * 1000) / 1000;
             const label = `Anillo ${a.n} · S/ ${a.tarifa.toFixed(2)}`;
             const w = label.length * 8.4 + 18;
             return (

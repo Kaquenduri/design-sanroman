@@ -214,9 +214,17 @@ export function seededPoint(seed: number): WorldPoint {
   const rnd = mulberry32(seed * 2654435761);
   const ang = rnd() * Math.PI * 2;
   const rad = Math.pow(rnd(), 0.62) * 560;
+  // Distintos motores pueden imprimir el último decimal de una operación
+  // trigonométrica de forma diferente; redondear evita que React descarte el
+  // SVG durante la hidratación sin alterar una posición visible en el mapa.
+  const stable = (value: number) => Math.round(value * 1000) / 1000;
   return {
-    x: Math.max(40, Math.min(WORLD.w - 40, PLAZA.x + Math.cos(ang) * rad)),
-    y: Math.max(40, Math.min(1040, PLAZA.y + Math.sin(ang) * rad * 0.86)),
+    x: stable(
+      Math.max(40, Math.min(WORLD.w - 40, PLAZA.x + Math.cos(ang) * rad))
+    ),
+    y: stable(
+      Math.max(40, Math.min(1040, PLAZA.y + Math.sin(ang) * rad * 0.86))
+    ),
   };
 }
 
