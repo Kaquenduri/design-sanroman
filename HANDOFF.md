@@ -4,16 +4,27 @@ Documento de contexto para continuar el trabajo en otra sesión o con otro
 asistente. Escrito el 2026-08-30, tras el rediseño completo de las tres
 superficies.
 
+> **Actualización de alcance — 2026-09-02:** la primera versión ya no tendrá
+> app de cliente. Los servicios entran por llamada: la operadora registra los
+> datos, busca recojo y destino en un mapa real de Juliaca, ajusta el punto
+> exacto moviendo el mapa, acuerda un precio editable, elige Yape o efectivo
+> y asigna la unidad disponible más cercana. El celular consulta un padrón
+> sintético que en producción se reemplazará por la API privada del gremio.
+> Esta decisión reemplaza cualquier
+> indicación posterior de este documento sobre solicitudes desde `/cliente`,
+> tarifa inmutable o pago exclusivamente en efectivo.
+
 ---
 
 ## 1. Qué es esto
 
-Maqueta de front-end (sin backend, sin GPS, sin mapas reales) del sistema de
+Maqueta de front-end (sin backend ni GPS en vivo) del sistema de
 despacho digital del gremio **Taxi Real San Román**, gremial 32-2020, de
 Juliaca, San Román, Puno, Perú.
 
 **Stack:** Next.js 15.5.24 (App Router) · React 19 · TypeScript · CSS Modules ·
-`lucide-react` para iconos. Sin librería de UI, sin Tailwind. Node 22+.
+`lucide-react` para iconos · Leaflet + OpenStreetMap para el mapa real de la
+operadora. Sin Tailwind. Node 22+.
 
 ```bash
 npm install
@@ -285,8 +296,8 @@ inventes de nuevo ni las contradigas.**
   de asignación automáticamente. Es un bloqueo duro, no un aviso.
   **Sin decidir:** el periodo de gracia tras el vencimiento. Está marcado como
   pendiente en la UI; mantenlo marcado.
-- **Pago 100% en efectivo** en Fase 1. **No** mostrar afordancias de tarjeta o
-  billetera digital, ni siquiera deshabilitadas.
+- **Pago acordado por llamada:** la operadora registra **Yape o efectivo** y
+  puede corregir el precio antes de asignar la unidad.
 - **Canal teléfono**: la operadora puede registrar solicitudes que entran por
   llamada. Está en el filtro de la cola.
 - Idioma: español de Perú, registro neutro, sin jerga regional.

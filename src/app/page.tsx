@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { ArrowRight, Smartphone, MapPin, Radio, Info } from 'lucide-react';
+import { ArrowRight, Smartphone, Radio, Info } from 'lucide-react';
 import { Seal } from '@/components/ui';
 import s from './page.module.css';
 
@@ -9,7 +9,7 @@ const SURFACES = [
     kind: 'PWA móvil',
     icon: Smartphone,
     title: 'App del conductor',
-    text: 'Para el agremiado en turno: conectarse, aceptar la propuesta en 22 segundos y cerrar el viaje cobrando en efectivo.',
+    text: 'Para el agremiado en turno: conectarse, recibir la asignación de la central y completar el servicio.',
     items: [
       'Propuesta con cuenta atrás y tarifa fija de anillo',
       'Cronómetro de embarque de 2 min por ordenanza municipal',
@@ -17,27 +17,15 @@ const SURFACES = [
     ],
   },
   {
-    href: '/cliente',
-    kind: 'PWA móvil',
-    icon: MapPin,
-    title: 'App del cliente',
-    text: 'Para quien espera en la esquina: destino, categoría y precio exacto antes de solicitar, sin regateo ni sorpresas.',
-    items: [
-      'Cuatro categorías con precio y capacidad reales',
-      'Verificación de unidad con el sello del gremio',
-      'Cascada de propuestas visible mientras busca',
-    ],
-  },
-  {
     href: '/operadora',
     kind: 'Web escritorio',
     icon: Radio,
     title: 'Panel de la operadora',
-    text: 'Para la central: cola en vivo, flota sobre el mapa con anillos tarifarios y asignación manual cuando la cascada se agota.',
+    text: 'Para la central: registro de llamadas, recojo sobre el mapa, precio acordado y asignación manual de unidad.',
     items: [
-      'Cola de solicitudes por canal: app y teléfono',
-      'Unidad más cercana sugerida sobre el mapa',
-      'Conductores, unidades, membresías y reportes',
+      'Ingreso de cliente, teléfono, recojo y destino',
+      'Precio editable y cobro por Yape o efectivo',
+      'Mapa interactivo y unidad más cercana sugerida',
     ],
   },
 ];
@@ -59,9 +47,9 @@ export default function Home() {
           <h1 className={s.headline}>Despacho digital del gremio</h1>
         </div>
         <p className={s.lede}>
-          Tres superficies del mismo sistema: el conductor en la calle, el
-          pasajero en la esquina y la central que supervisa. Tarifa fija por
-          anillo, pago en efectivo y la membresía gremial como llave de acceso.
+          Primera versión centrada en dos superficies: el conductor en la calle
+          y la central que recibe llamadas, acuerda el precio y asigna la unidad.
+          La membresía gremial continúa siendo la llave de acceso.
         </p>
 
         <div className={s.grid}>

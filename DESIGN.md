@@ -140,6 +140,13 @@ unidades del mundo SVG. Sin esa compensación se agrandan en encuadres cerrados.
 
 ## Motor cartográfico
 
+En `/operadora`, Leaflet y OpenStreetMap sustituyen el plano ilustrativo por
+un mapa navegable de Juliaca. La operadora busca una referencia, el mapa vuela
+al resultado y un pin fijo permite ajustar el punto exacto antes de confirmarlo.
+El buscador se limita a Juliaca y mantiene atribución visible. Las posiciones
+de flota, distancias y tiempos siguen siendo sintéticos hasta conectar GPS y
+ruteo reales.
+
 `src/lib/city.ts` define un mundo compartido y determinista de 1600 × 1200
 unidades, centrado tarifariamente en la Plaza de Armas. Con semilla fija genera
 manzanas y conserva el mismo árbol en servidor y cliente.
@@ -181,7 +188,8 @@ Reglas vinculantes:
 - mantener targets táctiles de al menos 44 px en móvil;
 - usar Lucide para iconografía, sin mezclar emoji como iconos;
 - etiquetar todo dato inventado con `Synthetic`;
-- no crear controles de pago digital en Fase 1: el cobro es en efectivo;
+- en la primera versión de despacho telefónico, la operadora registra Yape o
+  efectivo y puede editar el precio acordado;
 - no usar `new Date()` durante render; los relojes arrancan en `null` y se
   actualizan en un efecto.
 
