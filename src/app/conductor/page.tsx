@@ -27,8 +27,8 @@ export default function ConductorPage() {
       </PhoneFrame>
 
       <p className={s.hint}>
-        Conéctate, simula una propuesta entrante y recorre el viaje completo
-        hasta el cobro en efectivo.
+        Abre también la operadora, registra una llamada y observa el despacho
+        sincronizado con la Unidad 01.
       </p>
     </main>
   );

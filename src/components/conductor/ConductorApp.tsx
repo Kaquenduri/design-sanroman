@@ -1,476 +1,110 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import {
-  Home,
-  Wallet,
-  User,
-  Crosshair,
-  Layers,
-  Phone,
-  FileText,
-  Bell,
-  LogOut,
-  ShieldCheck,
-} from 'lucide-react';
-import {
-  AppShell,
-  MapLayer,
-  TopChrome,
-  Grow,
-  StatusPill,
-  BottomStack,
-  TabBar,
-  Panel,
-  MapControls,
-  fitCamera,
-  markerScale,
-} from '@/components/shared/Shell';
-import {
-  RouteLine,
-  PickupPin,
-  DestPin,
-  UnitMarker,
-  SearchPulse,
-} from '@/components/map/MapMarkers';
-import {
-  Button,
-  IconButton,
-  Chip,
-  Avatar,
-  Card,
-  Stat,
-  Stars,
-  Plate,
-  UnitBadge,
-  Seal,
-  Divider,
-  Synthetic,
-} from '@/components/ui';
-import {
-  UNIT_POSITIONS,
-  TODAY_TRIPS,
-  formatPEN,
-  formatDate,
-  fareBreakdown,
-  membershipBadge,
-} from '@/data';
-import { routeBetween, quadControl, pointOnQuad } from '@/lib/city';
-import {
-  DRIVER,
-  UNIT,
-  MEMBERSHIP,
-  REQUEST,
-  CATEGORY,
-  SheetOffline,
-  SheetOnline,
-  SheetProposal,
-  SheetPickup,
-  SheetArrived,
-  SheetTrip,
-  SheetFinished,
-} from './ConductorSheets';
+import { useEffect, useMemo, useState } from 'react';
+import dynamic from 'next/dynamic';
+import { Home, User, Wallet } from 'lucide-react';
+import { AppShell, BottomStack, Grow, Panel, StatusPill, TabBar, TopChrome } from '@/components/shared/Shell';
+import { Avatar, Card, Chip, Plate, Seal, Stat, Synthetic, UnitBadge } from '@/components/ui';
+import { DRIVERS, MEMBERSHIPS, TODAY_TRIPS, UNITS, UNIT_POSITIONS, formatDate, formatPEN, type Unit } from '@/data';
+import { worldToGeo } from '@/lib/juliaca';
+import { acceptDispatchOffer, advanceDispatchCandidate, rejectDispatchOffer, subscribeDispatchJobs, updateDispatchStatus, type DispatchJob } from '@/lib/dispatch';
+import { pointAlongRoute } from '@/lib/routing';
+import { useRoadRoute } from '@/hooks/useRoadRoute';
+import { SheetArrived, SheetFinished, SheetMembershipBlocked, SheetOffline, SheetOnline, SheetPickup, SheetProposal, SheetTrip } from './ConductorSheets';
 import c from './Conductor.module.css';
 
-type Screen =
-  | 'offline'
-  | 'online'
-  | 'proposal'
-  | 'pickup'
-  | 'arrived'
-  | 'trip'
-  | 'finished';
-
+const ConductorMap = dynamic(() => import('./ConductorMap').then((module) => module.ConductorMap), { ssr: false });
+type Screen = 'offline' | 'online' | 'proposal' | 'pickup' | 'arrived' | 'trip' | 'finished';
 type Tab = 'inicio' | 'ganancias' | 'perfil';
-
-/* Geografía fija del viaje de demo. */
-const START = UNIT_POSITIONS[UNIT.id];
-const PICKUP = REQUEST.pickup;
-const DEST = REQUEST.destination;
-
-const LEG_A = routeBetween(START, PICKUP, 5);
-const CTRL_A = quadControl(START, PICKUP, 5);
-const LEG_B = routeBetween(PICKUP, DEST, 9);
-const CTRL_B = quadControl(PICKUP, DEST, 9);
-
-const PROPOSAL_SECONDS = 22; // `PropuestaViaje.timeout_segundos` del ERD
-const BOARDING_SECONDS = 120; // tope municipal de embarque
-
-const FARE = fareBreakdown(PICKUP, CATEGORY);
+const BOARDING_SECONDS = 120;
 
 export function ConductorApp() {
-  const [screen, setScreen] = useState<Screen>('offline');
+  const [unitId, setUnitId] = useState('u01');
+  const [screen, setScreen] = useState<Screen>('online');
   const [tab, setTab] = useState<Tab>('inicio');
-  const [seconds, setSeconds] = useState(PROPOSAL_SECONDS);
+  const [jobs, setJobs] = useState<DispatchJob[]>([]);
+  const [nowMs, setNowMs] = useState<number | null>(null);
   const [boarding, setBoarding] = useState(BOARDING_SECONDS);
   const [elapsed, setElapsed] = useState(0);
   const [progress, setProgress] = useState(0);
-  const [rating, setRating] = useState(0);
 
-  /* Cuenta atrás de la propuesta: al agotarse, pasa a la siguiente unidad. */
   useEffect(() => {
-    if (screen !== 'proposal') return;
-    if (seconds <= 0) {
-      setScreen('online');
-      return;
-    }
-    const t = setTimeout(() => setSeconds((s) => s - 1), 1000);
-    return () => clearTimeout(t);
-  }, [screen, seconds]);
+    const requested = new URLSearchParams(window.location.search).get('unit');
+    if (requested && UNITS.some((unit) => unit.id === requested)) setUnitId(requested);
+  }, []);
+  useEffect(() => subscribeDispatchJobs(setJobs), []);
+  useEffect(() => {
+    setNowMs(Date.now());
+    const id = setInterval(() => setNowMs(Date.now()), 1000);
+    return () => clearInterval(id);
+  }, []);
 
-  /* Avance del vehículo sobre la ruta activa. */
+  const unit = UNITS.find((item) => item.id === unitId) ?? UNITS[0];
+  const driver = DRIVERS.find((item) => item.id === unit.driverId) ?? DRIVERS[0];
+  const membership = MEMBERSHIPS.find((item) => item.driverId === driver.id) ?? MEMBERSHIPS[0];
+  const identity = { unit, driver, membership };
+  const job = jobs.find((item) => item.offer?.unitId === unitId || (item.assignedUnitId === unitId && !['finalizado', 'cancelado'].includes(item.status))) ?? null;
+  const start = worldToGeo(UNIT_POSITIONS[unit.id]);
+  const routeToPickup = useRoadRoute(job ? start : null, job?.pickup ?? null);
+  const routeToDestination = useRoadRoute(job?.pickup ?? null, job?.destination ?? null);
+
+  useEffect(() => {
+    if (membership.status === 'vencida') return;
+    if (job?.status === 'ofertando' && job.offer?.unitId === unitId) setScreen('proposal');
+    else if (job?.status === 'aceptado' || job?.status === 'recogiendo') setScreen('pickup');
+    else if (job?.status === 'esperando') setScreen('arrived');
+    else if (job?.status === 'en-viaje') setScreen('trip');
+  }, [job?.status, job?.offer?.unitId, membership.status, unitId]);
+
+  const secondsLeft = job?.offer && nowMs !== null ? Math.max(0, Math.ceil((job.offer.expiresAt - nowMs) / 1000)) : 22;
+  useEffect(() => {
+    if (job?.status === 'ofertando' && job.offer?.unitId === unitId && secondsLeft === 0) {
+      advanceDispatchCandidate(job.id, 'vencida'); setScreen('online');
+    }
+  }, [job, secondsLeft, unitId]);
   useEffect(() => {
     if (screen !== 'pickup' && screen !== 'trip') return;
-    const id = setInterval(() => {
-      setProgress((p) => Math.min(1, p + 0.012));
-    }, 120);
+    const id = setInterval(() => setProgress((value) => Math.min(1, value + 0.004)), 300);
     return () => clearInterval(id);
   }, [screen]);
-
   useEffect(() => {
     if (screen !== 'arrived') return;
-    const id = setInterval(() => setBoarding((b) => Math.max(0, b - 1)), 1000);
+    const id = setInterval(() => setBoarding((value) => Math.max(0, value - 1)), 1000);
     return () => clearInterval(id);
   }, [screen]);
-
   useEffect(() => {
     if (screen !== 'trip') return;
-    const id = setInterval(() => setElapsed((e) => e + 1), 1000);
+    const id = setInterval(() => setElapsed((value) => value + 1), 1000);
     return () => clearInterval(id);
   }, [screen]);
 
-  const goOnline = () => {
-    setScreen('online');
-    setTab('inicio');
-  };
+  const activeRoute = screen === 'trip' || screen === 'finished' ? routeToDestination.route : routeToPickup.route;
+  const car = useMemo(() => activeRoute?.points.length ? pointAlongRoute(activeRoute.points, screen === 'proposal' ? 0 : progress) : screen === 'arrived' && job ? job.pickup : screen === 'finished' && job ? job.destination : start, [activeRoute, job, progress, screen, start]);
+  const pickup = job && !['trip', 'finished'].includes(screen) ? job.pickup : null;
+  const destination = job && ['trip', 'finished', 'proposal'].includes(screen) ? job.destination : null;
+  const showTabs = screen === 'offline' || screen === 'online';
+  const remaining = Math.max(0, Math.round((activeRoute?.durationSeconds ?? 180) * (1 - progress)));
 
-  const acceptProposal = () => {
-    setProgress(0);
-    setScreen('pickup');
-  };
+  const accept = () => { if (!job) return; acceptDispatchOffer(job.id, unitId); updateDispatchStatus(job.id, 'recogiendo'); setProgress(0); setScreen('pickup'); };
+  const reject = () => { if (!job) return; rejectDispatchOffer(job.id, unitId); setScreen('online'); };
 
-  const startTrip = () => {
-    setProgress(0);
-    setElapsed(0);
-    setScreen('trip');
-  };
+  return <AppShell className={c.driverShell}>
+    <ConductorMap car={car} pickup={pickup} destination={destination} route={activeRoute?.points ?? []} selected={Boolean(job)} />
+    <TopChrome><StatusPill live={screen !== 'offline'}>{membership.status === 'vencida' ? 'Membresía bloqueada' : screen === 'online' ? `● Unidad ${unit.n} disponible` : screen === 'proposal' ? 'Nueva propuesta de la central' : screen === 'pickup' ? 'Navegando al recojo' : screen === 'arrived' ? 'Esperando pasajero' : screen === 'trip' ? 'Viaje en curso' : screen === 'finished' ? 'Confirmar cobro' : 'Sin conexión'}</StatusPill><Grow /></TopChrome>
+    <BottomStack><div key={screen}>
+      {membership.status === 'vencida' ? <SheetMembershipBlocked identity={identity} /> : screen === 'offline' ? <SheetOffline identity={identity} onGoOnline={() => setScreen('online')} /> : screen === 'online' ? <SheetOnline unit={unit} onGoOffline={() => setScreen('offline')} /> : job && screen === 'proposal' ? <SheetProposal job={job} secondsLeft={secondsLeft} route={routeToPickup.route} onAccept={accept} onReject={reject} /> : job && screen === 'pickup' ? <SheetPickup job={job} route={routeToPickup.route} remaining={remaining} onArrived={() => { updateDispatchStatus(job.id, 'esperando'); setBoarding(BOARDING_SECONDS); setScreen('arrived'); }} /> : job && screen === 'arrived' ? <SheetArrived job={job} boardingLeft={boarding} onStart={() => { updateDispatchStatus(job.id, 'en-viaje'); setProgress(0); setElapsed(0); setScreen('trip'); }} /> : job && screen === 'trip' ? <SheetTrip job={job} route={routeToDestination.route} elapsed={elapsed} remaining={remaining} onFinish={() => setScreen('finished')} /> : job && screen === 'finished' ? <SheetFinished job={job} unit={unit} onConfirm={() => { updateDispatchStatus(job.id, 'finalizado'); setProgress(0); setScreen('online'); }} /> : <SheetOnline unit={unit} onGoOffline={() => setScreen('offline')} />}
+    </div>{showTabs && <TabBar<Tab> value={tab} onChange={setTab} items={[{ value: 'inicio', label: 'Inicio', icon: <Home size={20} /> }, { value: 'ganancias', label: 'Ganancias', icon: <Wallet size={20} /> }, { value: 'perfil', label: 'Perfil', icon: <User size={20} /> }]} />}</BottomStack>
+    {showTabs && tab === 'ganancias' && <Earnings onBack={() => setTab('inicio')} />}
+    {showTabs && tab === 'perfil' && <Profile identity={identity} onBack={() => setTab('inicio')} />}
+  </AppShell>;
+}
 
-  const backOnline = () => {
-    setProgress(0);
-    setRating(0);
-    setBoarding(BOARDING_SECONDS);
-    setSeconds(PROPOSAL_SECONDS);
-    setScreen('online');
-  };
+function Earnings({ onBack }: { onBack: () => void }) {
+  const total = TODAY_TRIPS.reduce((sum, trip) => sum + trip.fare, 0);
+  const cash = TODAY_TRIPS.filter((_, index) => index % 3 !== 0).reduce((sum, trip) => sum + trip.fare, 0);
+  return <Panel title="Ganancias de hoy" onBack={onBack}><Card brand className={c.earningsHero}><Stat label="Total cobrado" value={formatPEN(total)} sub={`${TODAY_TRIPS.length} servicios`} size="lg" /></Card><Card><div className={`${c.metrics} ${c.metricsFlush}`}><Stat label="Efectivo" value={formatPEN(cash)} sub="En caja" size="sm" /><Stat label="Yape" value={formatPEN(total - cash)} sub="Digital" size="sm" /></div></Card><Synthetic>Montos sintéticos de demostración</Synthetic></Panel>;
+}
 
-  /* Encuadre: la cámara sigue la acción y la deja sobre la hoja, no detrás. */
-  const view = (() => {
-    switch (screen) {
-      case 'offline':
-        return fitCamera([START], { min: 760 });
-      case 'online':
-        return fitCamera([START], { min: 620 });
-      case 'proposal':
-      case 'pickup':
-        return fitCamera([START, PICKUP]);
-      case 'arrived':
-        return fitCamera([PICKUP], { min: 430 });
-      case 'trip':
-        return fitCamera([PICKUP, DEST]);
-      case 'finished':
-        return fitCamera([DEST], { min: 520 });
-    }
-  })();
-
-  const k = markerScale(view);
-
-  /* Posición del vehículo sobre la pierna activa. */
-  const car = (() => {
-    if (screen === 'pickup')
-      return pointOnQuad(START, CTRL_A, PICKUP, progress);
-    if (screen === 'trip') return pointOnQuad(PICKUP, CTRL_B, DEST, progress);
-    if (screen === 'arrived')
-      return { x: PICKUP.x, y: PICKUP.y + 18, angle: -90 };
-    if (screen === 'finished') return { x: DEST.x, y: DEST.y, angle: -90 };
-    return { x: START.x, y: START.y, angle: -90 };
-  })();
-
-  const onHome = screen === 'offline' || screen === 'online';
-  const showTabs = onHome;
-  const etaSeconds = Math.round((1 - progress) * 180);
-  const liveFare = FARE.total;
-  const badge = membershipBadge(MEMBERSHIP);
-
-  return (
-    <AppShell>
-      <MapLayer
-        viewBox={view}
-        dimmed={screen === 'offline'}
-        labels={screen !== 'arrived'}
-      >
-        {screen === 'online' && <SearchPulse x={START.x} y={START.y} k={k} />}
-
-        {(screen === 'proposal' || screen === 'pickup') && (
-          <>
-            <RouteLine d={LEG_A} k={k} />
-            <PickupPin x={PICKUP.x} y={PICKUP.y} k={k} />
-          </>
-        )}
-
-        {screen === 'arrived' && (
-          <PickupPin x={PICKUP.x} y={PICKUP.y} k={k} />
-        )}
-
-        {(screen === 'trip' || screen === 'finished') && (
-          <>
-            <RouteLine d={LEG_B} animated={screen === 'trip'} k={k} />
-            <PickupPin x={PICKUP.x} y={PICKUP.y} k={k} />
-            <DestPin x={DEST.x} y={DEST.y} k={k} />
-          </>
-        )}
-
-        {screen !== 'offline' && (
-          <UnitMarker
-            x={car.x}
-            y={car.y}
-            n={UNIT.n}
-            status={
-              screen === 'trip' || screen === 'pickup' ? 'on-trip' : 'active'
-            }
-            heading={car.angle + 90}
-            selected
-            k={k}
-          />
-        )}
-      </MapLayer>
-
-      <TopChrome>
-        {screen === 'offline' && (
-          <StatusPill>
-            <span className={c.statusDot} />
-            Sin conexión
-          </StatusPill>
-        )}
-        {screen === 'online' && <StatusPill live>● En línea</StatusPill>}
-        {screen === 'proposal' && (
-          <StatusPill live>Propuesta asignada a ti</StatusPill>
-        )}
-        {(screen === 'pickup' || screen === 'arrived') && (
-          <StatusPill>Recogiendo · Unidad {UNIT.n}</StatusPill>
-        )}
-        {screen === 'trip' && <StatusPill live>Viaje en curso</StatusPill>}
-        {screen === 'finished' && <StatusPill>Viaje finalizado</StatusPill>}
-        <Grow />
-      </TopChrome>
-
-      {onHome && (
-        <MapControls>
-          <IconButton variant="glass" aria-label="Centrar en mi posición">
-            <Crosshair size={18} />
-          </IconButton>
-          <IconButton variant="glass" aria-label="Capas del mapa">
-            <Layers size={18} />
-          </IconButton>
-        </MapControls>
-      )}
-
-      <BottomStack>
-        <div key={screen}>
-          {screen === 'offline' && <SheetOffline onGoOnline={goOnline} />}
-          {screen === 'online' && (
-            <SheetOnline
-              onGoOffline={() => setScreen('offline')}
-              onSimulate={() => {
-                setSeconds(PROPOSAL_SECONDS);
-                setScreen('proposal');
-              }}
-            />
-          )}
-          {screen === 'proposal' && (
-            <SheetProposal
-              secondsLeft={seconds}
-              total={PROPOSAL_SECONDS}
-              fare={liveFare}
-              onAccept={acceptProposal}
-              onReject={() => setScreen('online')}
-            />
-          )}
-          {screen === 'pickup' && (
-            <SheetPickup
-              etaSeconds={etaSeconds}
-              onArrived={() => setScreen('arrived')}
-            />
-          )}
-          {screen === 'arrived' && (
-            <SheetArrived boardingLeft={boarding} onStart={startTrip} />
-          )}
-          {screen === 'trip' && (
-            <SheetTrip
-              elapsed={elapsed}
-              fare={liveFare}
-              onFinish={() => setScreen('finished')}
-            />
-          )}
-          {screen === 'finished' && (
-            <SheetFinished
-              fare={liveFare}
-              lines={FARE.lines}
-              rating={rating}
-              onRate={setRating}
-              onNext={backOnline}
-            />
-          )}
-        </div>
-
-        {showTabs && (
-          <TabBar<Tab>
-            value={tab}
-            onChange={setTab}
-            items={[
-              { value: 'inicio', label: 'Inicio', icon: <Home size={20} /> },
-              {
-                value: 'ganancias',
-                label: 'Ganancias',
-                icon: <Wallet size={20} />,
-              },
-              { value: 'perfil', label: 'Perfil', icon: <User size={20} /> },
-            ]}
-          />
-        )}
-      </BottomStack>
-
-      {showTabs && tab === 'ganancias' && (
-        <Panel title="Ganancias de hoy" onBack={() => setTab('inicio')}>
-          <Card brand className={c.earningsHero}>
-            <Stat
-              label="Total cobrado"
-              value={formatPEN(TODAY_TRIPS.reduce((a, t) => a + t.fare, 0))}
-              sub="8 viajes · 100% en efectivo"
-              size="lg"
-            />
-          </Card>
-
-          <Card>
-            <div className={`${c.metrics} ${c.metricsFlush}`}>
-              <Stat
-                className={c.metricDivided}
-                label="Promedio"
-                value={formatPEN(
-                  TODAY_TRIPS.reduce((a, t) => a + t.fare, 0) /
-                    TODAY_TRIPS.length
-                )}
-                size="sm"
-              />
-              <Stat
-                className={c.metricDivided}
-                label="Conectado"
-                value="4h 28m"
-                size="sm"
-              />
-            </div>
-          </Card>
-
-          <div className={c.sectionLabel}>Viajes completados</div>
-          <Card pad={false} className={c.listCard}>
-            {TODAY_TRIPS.map((t) => (
-              <div key={t.id} className={c.tripRow}>
-                <span className={c.tripTime}>{t.startedAt}</span>
-                <div className={c.tripBody}>
-                  <div className={c.tripName}>{t.passengerName}</div>
-                  <div className={c.tripRoute}>
-                    {t.pickupAddress} → {t.destinationAddress}
-                  </div>
-                </div>
-                <span className={c.tripFare}>{formatPEN(t.fare)}</span>
-              </div>
-            ))}
-          </Card>
-
-          <Synthetic>Datos sintéticos de demostración</Synthetic>
-        </Panel>
-      )}
-
-      {showTabs && tab === 'perfil' && (
-        <Panel title="Mi perfil" onBack={() => setTab('inicio')}>
-          <Card className={c.profileHero}>
-            <div className={c.person}>
-              <Avatar initials={DRIVER.avatarSeed} size={56} ring />
-              <div className={c.personBody}>
-                <div className={`${c.personName} ${c.personNameLarge}`}>
-                  {DRIVER.name}
-                </div>
-                <div className={c.personMeta}>
-                  <Stars value={DRIVER.rating} />
-                  <span>· desde {formatDate(DRIVER.joinedAt)}</span>
-                </div>
-              </div>
-            </div>
-          </Card>
-
-          <div className={c.sectionLabel}>Unidad asignada</div>
-          <Card className={c.unitProfileCard}>
-            <div className={c.person}>
-              <UnitBadge n={UNIT.n} size="lg" />
-              <div className={c.personBody}>
-                <div className={c.personName}>
-                  {UNIT.marca} {UNIT.modelo} {UNIT.anio}
-                </div>
-                <div className={`${c.personMeta} ${c.personMetaSpaced}`}>
-                  <Plate value={UNIT.placa} />
-                  <Chip tone="brand">{CATEGORY.label}</Chip>
-                </div>
-              </div>
-            </div>
-          </Card>
-
-          <div className={c.sectionLabel}>Habilitación gremial</div>
-          <div className={c.verify}>
-            <Seal size={30} compact className={c.verifySeal} />
-            <div className={c.verifyBody}>
-              <div className={c.verifyTitle}>Membresía {badge.label.toLowerCase()}</div>
-              <div className={c.verifyMeta}>
-                Vence el {formatDate(MEMBERSHIP.expiresOn)}
-              </div>
-            </div>
-            <Chip tone="success" dot>
-              Al día
-            </Chip>
-          </div>
-
-          <Card pad={false} className={c.listCard}>
-            <div className={c.rows}>
-              <div className={c.row}>
-                <Phone size={19} className={c.rowIcon} />
-                <div className={c.rowBody}>
-                  <div className={c.rowLabel}>Teléfono</div>
-                  <div className={`${c.rowValue} mono`}>{DRIVER.phone}</div>
-                </div>
-              </div>
-              <button className={c.row}>
-                <FileText size={19} className={c.rowIcon} />
-                <div className={c.rowBody}>
-                  <div className={c.rowLabel}>Documentos del vehículo</div>
-                  <div className={c.rowValue}>SOAT, CITV y licencia vigentes</div>
-                </div>
-                <ShieldCheck size={17} color="var(--success)" />
-              </button>
-              <button className={c.row}>
-                <Bell size={19} className={c.rowIcon} />
-                <div className={c.rowBody}>
-                  <div className={c.rowLabel}>Notificaciones</div>
-                  <div className={c.rowValue}>Sonido y vibración activados</div>
-                </div>
-              </button>
-            </div>
-          </Card>
-
-          <Divider />
-          <Button variant="ghost" size="md" full>
-            <LogOut size={17} />
-            Cerrar sesión
-          </Button>
-        </Panel>
-      )}
-    </AppShell>
-  );
+function Profile({ identity, onBack }: { identity: { driver: typeof DRIVERS[number]; unit: Unit; membership: typeof MEMBERSHIPS[number] }; onBack: () => void }) {
+  return <Panel title="Identidad de la unidad" onBack={onBack}><Card brand className={c.unitProfileCard}><div className={c.person}><Seal size={64} /><div className={c.personBody}><div className={c.personName}>{identity.driver.name}</div><div className={c.personMeta}>Agremiado Real San Román</div></div><UnitBadge n={identity.unit.n} size="lg" /></div></Card><Card><div className={c.person}><Avatar initials={identity.driver.avatarSeed} size={50} ring /><div className={c.personBody}><div className={c.personName}>{identity.unit.marca} {identity.unit.modelo}</div><div className={c.personMeta}><Plate value={identity.unit.placa} /><Chip tone="success">Membresía hasta {formatDate(identity.membership.expiresOn)}</Chip></div></div></div></Card><Synthetic>Identidad sintética para demostración local</Synthetic></Panel>;
 }

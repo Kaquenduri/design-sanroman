@@ -55,6 +55,126 @@
   flex-shrink: 0;
 }
 
+/* Leaflet reemplaza el mapa sintético, pero conserva el patrón mapa-suelo + hoja. */
+.driverShell {
+  isolation: isolate;
+}
+
+.leafletMap {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  background: var(--map-land);
+}
+
+.leafletMap > :global(.leaflet-container) {
+  width: 100%;
+  height: 100%;
+  background: var(--map-land);
+}
+
+.leafletMap :global(.leaflet-tile-pane) {
+  filter: invert(0.88) hue-rotate(180deg) brightness(0.52) saturate(0.5) contrast(1.12);
+}
+
+.leafletMap :global(.leaflet-control-attribution) {
+  background: var(--glass-strong);
+  color: var(--fg-muted);
+  font-size: 8px;
+}
+
+.leafletMap :global(.leaflet-control-attribution a) {
+  color: var(--brand-300);
+}
+
+.driverRoadRoute {
+  stroke: var(--brand-400);
+  stroke-width: 6;
+  stroke-linecap: round;
+  filter: drop-shadow(0 0 6px var(--brand-a40));
+}
+
+.leafletMap :global(.driver-car),
+.leafletMap :global(.driver-pin) {
+  border: 0;
+  background: transparent;
+}
+
+.leafletMap :global(.driver-car img) {
+  width: 58px;
+  height: 58px;
+  object-fit: contain;
+  filter: brightness(0) invert(1) drop-shadow(0 6px 9px var(--bg));
+}
+
+.leafletMap :global(.driver-car--selected img) {
+  filter: brightness(0) invert(1) drop-shadow(0 0 13px var(--brand-500));
+}
+
+.leafletMap :global(.driver-car > span) {
+  position: absolute;
+  inset: 8px;
+  border-radius: var(--r-full);
+  box-shadow: 0 0 0 2px var(--brand-300), 0 0 24px var(--brand-a40);
+}
+
+.leafletMap :global(.driver-pin > span) {
+  width: 28px;
+  height: 28px;
+  display: block;
+  border-radius: var(--r-full) var(--r-full) var(--r-full) 3px;
+  transform: rotate(-45deg);
+  background: var(--brand-600);
+  box-shadow: inset 0 0 0 4px var(--brand-100), var(--sh-md);
+}
+
+.leafletMap :global(.driver-pin--destination > span) {
+  background: var(--fg);
+  box-shadow: inset 0 0 0 4px var(--surface-4), var(--sh-md);
+}
+
+.navigationHero {
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+  padding: var(--s-4);
+  margin-bottom: var(--s-3);
+  border-radius: var(--r-lg);
+  background: var(--glass-strong);
+  box-shadow: inset 0 0 0 1px var(--glass-border), var(--sh-md);
+  backdrop-filter: blur(18px) saturate(1.3);
+}
+
+.navigationHero > svg { color: var(--brand-300); }
+.navigationHero > div { min-width: 0; display: grid; }
+.navigationHero span, .navigationHero small { color: var(--fg-muted); font-size: var(--text-xs); }
+.navigationHero strong { font-family: var(--font-display); font-size: var(--text-lg); }
+
+.paymentMark {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  padding: var(--s-2) var(--s-3);
+  border-radius: var(--r-full);
+  background: var(--brand-700);
+  color: var(--brand-fg);
+  font-weight: 750;
+  text-transform: capitalize;
+}
+
+.blockedBody {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--s-3);
+  padding: var(--s-8) var(--s-4);
+  text-align: center;
+  color: var(--fg-muted);
+}
+
+.blockedBody > svg { color: var(--brand-300); }
+.blockedBody h2 { color: var(--fg); }
+
 /* ----------------------------------------------------- Cabina personal --- */
 
 .homeSheet {
