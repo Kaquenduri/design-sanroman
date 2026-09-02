@@ -1562,3 +1562,35 @@
   transition: opacity 0.3s ease;
 }
 
+/* ============================================
+   Car Marker Tinting via CSS Filters
+   SVGs from /public/cars/ have body #E4E0F0.
+   These filters recolor the body while keeping
+   wheels (black) and windows (light blue) intact.
+   ============================================ */
+
+.carTintActive {
+  filter: brightness(0.65) saturate(2.5) hue-rotate(85deg) contrast(1.1);
+  transition: filter 0.3s ease;
+}
+
+.carTintOnTrip {
+  filter: brightness(0.7) saturate(2.0) hue-rotate(265deg) contrast(1.1);
+  transition: filter 0.3s ease;
+}
+
+.carTintBreak {
+  filter: brightness(0.85) saturate(2.0) hue-rotate(35deg) contrast(1.05);
+  transition: filter 0.3s ease;
+}
+
+.carTintOffline {
+  filter: brightness(0.5) saturate(0.3) contrast(0.9);
+  transition: filter 0.3s ease;
+}
+
+.carTintBlocked {
+  filter: brightness(0.6) saturate(2.5) hue-rotate(-20deg) contrast(1.2);
+  transition: filter 0.3s ease;
+}
+

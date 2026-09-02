@@ -27,6 +27,8 @@ type Props = {
   onSearchRadiusChange: (radius: number | null) => void;
   onSearchOriginChange: (origin: Coordinates | null) => void;
   onHighlightUnit: (unitId: string | null) => void;
+  selectingLocation: 'origin' | 'destination' | null;
+  onSelectLocation: (loc: 'origin' | 'destination' | null) => void;
 };
 
 function distanceBetween(a: Coordinates, b: Coordinates): number {
@@ -87,13 +89,18 @@ export function DispatcherView({
   onSearchRadiusChange,
   onSearchOriginChange,
   onHighlightUnit,
+  selectingLocation,
+  onSelectLocation,
 }: Props) {
-  const [originText, setOriginText] = useState('');
-  const [destText, setDestText] = useState('');
   const [assignedUnit, setAssignedUnit] = useState<Unit | null>(null);
   const [searching, setSearching] = useState(false);
   const [searchPhase, setSearchPhase] = useState<DispatchPhase>('idle');
   const [selectedUnit, setSelectedUnit] = useState<Unit | null>(null);
+  
+  // Simulated street names for the UI
+  const [originAddress, setOriginAddress] = useState<string>('');
+  const [destAddress, setDestAddress] = useState<string>('');
+
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const timeoutsRef = useRef<ReturnType<typeof setTimeout>[]>([]);
 
@@ -104,26 +111,39 @@ export function DispatcherView({
     return () => window.removeEventListener('keydown', handler);
   }, [onClose]);
 
-  /* Auto-fill text when map click sets a point */
+  // Generate random street name on coordinate change
   useEffect(() => {
-    if (origin && !originText) setOriginText(formatCoords(origin));
-  }, [origin, originText]);
+    if (origin) {
+      const streets = ['Jr. San Román', 'Av. Circunvalación', 'Jr. Huancané', 'Av. San Martín', 'Jr. Moquegua', 'Jr. Piura', 'Av. Mártires 4 de Nov.', 'Jr. Jáuregui', 'Terminal Terrestre', 'Mercado Túpac Amaru', 'Plaza Bolognesi'];
+      const randomStreet = streets[Math.floor(Math.random() * streets.length)];
+      const randomNum = Math.floor(Math.random() * 1000) + 100;
+      setOriginAddress(`${randomStreet} ${randomNum}`);
+    } else {
+      setOriginAddress('');
+    }
+  }, [origin]);
 
   useEffect(() => {
-    if (destination && !destText) setDestText(formatCoords(destination));
-  }, [destination, destText]);
+    if (destination) {
+      const streets = ['Av. Tacna', 'Jr. Cusco', 'Jr. Apurímac', 'Real Plaza', 'Hospital Carlos Monge', 'Av. Triunfo', 'Jr. Mariano Melgar', 'Parque El Triciclista', 'Av. Independencia', 'Jr. Sandia'];
+      const randomStreet = streets[Math.floor(Math.random() * streets.length)];
+      const randomNum = Math.floor(Math.random() * 1000) + 100;
+      setDestAddress(`${randomStreet} ${randomNum}`);
+    } else {
+      setDestAddress('');
+    }
+  }, [destination]);
 
   const effectiveOrigin = useMemo(() => {
     if (origin) return origin;
-    if (originText.trim().length > 0) return { lat: -15.4975, lng: -70.130 };
     return null;
-  }, [origin, originText]);
+  }, [origin]);
 
   const distanceKm = useMemo(() => {
-    const dest = destination || (destText.trim().length > 0 ? { lat: -15.489, lng: -70.125 } : null);
+    const dest = destination;
     if (effectiveOrigin && dest) return +distanceBetween(effectiveOrigin, dest).toFixed(1);
     return null;
-  }, [effectiveOrigin, destination, destText]);
+  }, [effectiveOrigin, destination]);
 
   const fareEstimate = useMemo(() => {
     if (distanceKm !== null) return estimateFare(distanceKm);
@@ -278,7 +298,11 @@ export function DispatcherView({
 
   return (
     <>
-      <div className={styles.assignPanelOverlay} onClick={onClose} />
+      <div 
+        className={styles.assignPanelOverlay} 
+        onClick={selectingLocation ? undefined : onClose} 
+        style={{ pointerEvents: selectingLocation ? 'none' : 'auto', opacity: selectingLocation ? 0 : 1 }}
+      />
       <div className={styles.assignPanel}>
         <div className={styles.assignPanel__header}>
           <div className={styles.assignPanel__title}>Nueva asignación</div>
@@ -306,24 +330,32 @@ export function DispatcherView({
               {/* Origin */}
               <div className={styles.assignField}>
                 <div className={styles.assignField__label}>Origen</div>
-                <div className={styles.assignField__input}>
+                <div 
+                  className={styles.assignField__input} 
+                  style={{ cursor: 'pointer', border: selectingLocation === 'origin' ? '1px solid var(--accent)' : undefined }}
+                  onClick={() => onSelectLocation(selectingLocation === 'origin' ? null : 'origin')}
+                >
                   <MapPin size={14} color="var(--success)" />
-                  <input type="text" placeholder="Dirección de recogida" value={originText}
-                    onChange={e => { setOriginText(e.target.value); onSetOrigin(null); }} />
+                  <div style={{ flex: 1, color: origin ? 'var(--fg)' : 'var(--fg-subtle)', fontSize: 14, fontWeight: origin ? 600 : 400 }}>
+                    {origin ? originAddress : (selectingLocation === 'origin' ? 'Haz clic en el mapa...' : 'Seleccionar origen')}
+                  </div>
                 </div>
-                <div className={styles.assignField__hint}>Escribe la dirección o haz clic en el mapa</div>
                 {origin && <div className={styles.assignField__coords}>{formatCoords(origin)}</div>}
               </div>
 
               {/* Destination */}
               <div className={styles.assignField}>
                 <div className={styles.assignField__label}>Destino</div>
-                <div className={styles.assignField__input}>
+                <div 
+                  className={styles.assignField__input}
+                  style={{ cursor: 'pointer', border: selectingLocation === 'destination' ? '1px solid var(--accent)' : undefined }}
+                  onClick={() => onSelectLocation(selectingLocation === 'destination' ? null : 'destination')}
+                >
                   <Navigation size={14} color="var(--danger)" />
-                  <input type="text" placeholder="Dirección de destino" value={destText}
-                    onChange={e => { setDestText(e.target.value); onSetDestination(null); }} />
+                  <div style={{ flex: 1, color: destination ? 'var(--fg)' : 'var(--fg-subtle)', fontSize: 14, fontWeight: destination ? 600 : 400 }}>
+                    {destination ? destAddress : (selectingLocation === 'destination' ? 'Haz clic en el mapa...' : 'Seleccionar destino')}
+                  </div>
                 </div>
-                <div className={styles.assignField__hint}>Escribe la dirección o haz clic en el mapa</div>
                 {destination && <div className={styles.assignField__coords}>{formatCoords(destination)}</div>}
               </div>
 

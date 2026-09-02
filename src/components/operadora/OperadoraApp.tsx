@@ -35,6 +35,7 @@ export function OperadoraApp() {
   const [searchRadius, setSearchRadius] = useState<number | null>(null);
   const [searchOrigin, setSearchOrigin] = useState<Coordinates | null>(null);
   const [highlightedUnitId, setHighlightedUnitId] = useState<string | null>(null);
+  const [selectingLocation, setSelectingLocation] = useState<'origin' | 'destination' | null>(null);
 
   const [mounted, setMounted] = useState(false);
 
@@ -64,13 +65,21 @@ export function OperadoraApp() {
   const handleMapClick = useCallback(
     (coords: Coordinates) => {
       if (!assigning) return;
-      if (!origin) {
+      if (selectingLocation === 'origin') {
         setOrigin(coords);
-      } else if (!destination) {
+        setSelectingLocation(null);
+      } else if (selectingLocation === 'destination') {
         setDestination(coords);
+        setSelectingLocation(null);
+      } else {
+        if (!origin) {
+          setOrigin(coords);
+        } else if (!destination) {
+          setDestination(coords);
+        }
       }
     },
-    [assigning, origin, destination]
+    [assigning, origin, destination, selectingLocation]
   );
 
   const openAssign = useCallback(() => {
@@ -78,6 +87,7 @@ export function OperadoraApp() {
     setOrigin(null);
     setDestination(null);
     setHighlightedUnitId(null);
+    setSelectingLocation('origin');
   }, []);
 
   const closeAssign = useCallback(() => {
@@ -87,6 +97,7 @@ export function OperadoraApp() {
     setSearchRadius(null);
     setSearchOrigin(null);
     setHighlightedUnitId(null);
+    setSelectingLocation(null);
   }, []);
 
   if (!mounted) return null;
@@ -103,6 +114,7 @@ export function OperadoraApp() {
           searchRadius={searchRadius}
           searchOrigin={searchOrigin}
           highlightedUnitId={highlightedUnitId}
+          selectingLocation={selectingLocation}
         />
 
         {/* "Asignar carrera" trigger */}
@@ -126,6 +138,8 @@ export function OperadoraApp() {
             onSearchRadiusChange={setSearchRadius}
             onSearchOriginChange={setSearchOrigin}
             onHighlightUnit={setHighlightedUnitId}
+            selectingLocation={selectingLocation}
+            onSelectLocation={setSelectingLocation}
           />
         )}
 

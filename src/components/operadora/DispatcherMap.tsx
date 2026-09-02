@@ -23,6 +23,30 @@ const statusColors: Record<Unit['status'], string> = {
   blocked: 'var(--danger)',
 };
 
+/* ── Car marker orientation & tinting ── */
+function seededRandom(seed: number): number {
+  const x = Math.sin(seed * 9301 + 49297) * 233280;
+  return x - Math.floor(x);
+}
+
+const CAR_ANGLES = [0, 45, 90, 135, 180, 225, 270, 315];
+
+const CAR_VARIANT: Record<Unit['status'], string> = {
+  active: '/cars/Group 2.svg',
+  'on-trip': '/cars/Group 2.svg',
+  break: '/cars/Group 1.svg',
+  offline: '/cars/Group 1.svg',
+  blocked: '/cars/Group 2.svg',
+};
+
+const CAR_FILTER: Record<Unit['status'], string> = {
+  active: styles.carTintActive,
+  'on-trip': styles.carTintOnTrip,
+  break: styles.carTintBreak,
+  offline: styles.carTintOffline,
+  blocked: styles.carTintBlocked,
+};
+
 export type DispatcherMapProps = {
   onMapClick?: (coords: Coordinates) => void;
   pinOrigin?: Coordinates | null;
@@ -30,6 +54,7 @@ export type DispatcherMapProps = {
   searchRadius?: number | null;
   searchOrigin?: Coordinates | null;
   highlightedUnitId?: string | null;
+  selectingLocation?: 'origin' | 'destination' | null;
 };
 
 export function DispatcherMap({
@@ -39,6 +64,7 @@ export function DispatcherMap({
   searchRadius,
   searchOrigin,
   highlightedUnitId,
+  selectingLocation,
 }: DispatcherMapProps) {
   const svgRef = useRef<SVGSVGElement>(null);
   const [viewBox, setViewBox] = useState(INITIAL_VB);
@@ -198,13 +224,21 @@ export function DispatcherMap({
   const searching = searchRadius != null && searchRadius > 0;
   const maxR = searchRadius ?? 0;
 
+  // Custom cursor for map pin
+  const pinColor = selectingLocation === 'origin' ? '#10b981' : '#ef4444';
+  const pinCursorSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="${pinColor}" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path><circle cx="12" cy="10" r="3" fill="white"></circle></svg>`;
+  
+  const cursorStyle = selectingLocation 
+    ? `url("data:image/svg+xml;charset=utf-8,${encodeURIComponent(pinCursorSvg)}") 12 24, crosshair`
+    : dragging ? 'grabbing' : 'grab';
+
   return (
     <div className={styles.mapContainer}>
       <svg
         ref={svgRef}
         viewBox={`${viewBox.x} ${viewBox.y} ${viewBox.w} ${viewBox.h}`}
         preserveAspectRatio="xMidYMid meet"
-        style={{ width: '100%', height: '100%', display: 'block', cursor: dragging ? 'grabbing' : 'grab' }}
+        style={{ width: '100%', height: '100%', display: 'block', cursor: cursorStyle }}
         role="img"
         aria-label="Mapa de Juliaca con unidades en tiempo real"
         onMouseDown={handleMouseDown}
@@ -272,43 +306,74 @@ export function DispatcherMap({
           </g>
         )}
 
-        {/* Unit car markers */}
-        {UNITS.map((u) => {
+        {/* Unit car markers — SVGs from /public/cars/ with rotation + status circle + number */}
+        {(() => {
+          /* Dynamic car size: inversely proportional to zoom so cars stay visible when zoomed out */
+          const zoomRatio = SVG_W / viewBox.w; // 0.5 at 2×out, 1 at default, 4 at 4×in
+          const inv = Math.sqrt(Math.max(0.4, Math.min(3.0, 1 / zoomRatio))); // clamped inverse
+          const bw = 5;  // base car width at default zoom
+          const bh = 10; // base car height at default zoom
+          const br = 2.2; // base circle radius
+          const bt = 2.8; // base font size
+          return UNITS.map((u) => {
           const pos = UNIT_POSITIONS[u.id];
           if (!pos) return null;
           const p = project(pos);
-          const color = statusColors[u.status];
           const num = u.id.replace('u', '');
           const isHighlighted = highlightedUnitId === u.id;
+          const seed = parseInt(u.id.replace(/\D/g, ''), 10) || 0;
+          const angle = CAR_ANGLES[seed % CAR_ANGLES.length];
+          const href = CAR_VARIANT[u.status];
+          const tintClass = CAR_FILTER[u.status];
+          const color = statusColors[u.status];
+          const isVertical = href.includes('Group 1');
+          /* Scale car dimensions dynamically with zoom */
+          const w = isVertical ? bw * inv : bh * inv;
+          const h = isVertical ? bh * inv : bw * inv;
+          const cr = br * inv; // circle radius
+          const fs = bt * inv; // font size
           return (
             <g key={u.id} transform={`translate(${p.x}, ${p.y})`}>
-              {/* Highlight glow for selected unit */}
               {isHighlighted && (
                 <>
-                  <circle r="18" fill="var(--accent)" opacity="0.25" filter="url(#glowStrong)">
-                    <animate attributeName="r" values="16;22;16" dur="1.5s" repeatCount="indefinite" />
+                  <circle r={cr * 3.5} fill="var(--accent)" opacity="0.25" filter="url(#glowStrong)">
+                    <animate attributeName="r" values={`${cr * 3};${cr * 4.5};${cr * 3}`} dur="1.5s" repeatCount="indefinite" />
                     <animate attributeName="opacity" values="0.25;0.1;0.25" dur="1.5s" repeatCount="indefinite" />
                   </circle>
-                  <circle r="12" fill="var(--accent)" opacity="0.15" />
+                  <circle r={cr * 2.2} fill="var(--accent)" opacity="0.15" />
                 </>
               )}
-              {u.status === 'active' && <circle r="10" fill={color} opacity="0.18" />}
-              {u.status === 'blocked' && <circle r="10" fill={color} opacity="0.18" />}
-              {/* Car body */}
-              <path d="M -7 -2 L -5 -5.5 L 5 -5.5 L 7 -2 L 7 2 L -7 2 Z"
-                fill={isHighlighted ? 'var(--accent)' : color} stroke="#0b0616" strokeWidth="1.2" strokeLinejoin="round" />
-              {/* Roof */}
-              <path d="M -4 -5.5 L -3 -7.5 L 3 -7.5 L 4 -5.5"
-                fill="none" stroke={isHighlighted ? 'var(--accent)' : color} strokeWidth="1.2" strokeLinejoin="round" opacity="0.8" />
-              {/* Wheels */}
-              <circle cx="-4" cy="3" r="1.8" fill="#0b0616" />
-              <circle cx="4" cy="3" r="1.8" fill="#0b0616" />
-              {/* Unit number */}
-              <text y="0.5" fontSize="5.5" fill="#fff" textAnchor="middle" fontWeight="700"
-                style={{ pointerEvents: 'none' }}>{num}</text>
+              <g transform={`rotate(${angle})`}>
+                {/* Car image from /public/cars/ */}
+                <image
+                  href={href}
+                  width={w}
+                  height={h}
+                  x={-w / 2}
+                  y={-h / 2}
+                  className={tintClass}
+                  style={{ pointerEvents: 'none' }}
+                />
+                {/* Status circle (color changes by state) — on car body */}
+                <circle cx="0" cy={isVertical ? cr * 0.5 : 0} r={cr} fill={color} stroke="#1a1028" strokeWidth={cr * 0.15} />
+                {/* Unit number inside the circle */}
+                <text
+                  x="0"
+                  y={isVertical ? cr * 0.9 : cr * 0.4}
+                  fontSize={fs}
+                  fill="#ffffff"
+                  textAnchor="middle"
+                  fontWeight="800"
+                  fontFamily="sans-serif"
+                  style={{ pointerEvents: 'none' }}
+                >
+                  {num}
+                </text>
+              </g>
             </g>
           );
-        })}
+          });
+        })()}
 
         {/* Origin pin */}
         {originProj && (
