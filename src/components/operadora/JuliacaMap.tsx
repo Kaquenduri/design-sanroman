@@ -7,6 +7,7 @@ import {
   Marker,
   Polyline,
   TileLayer,
+  ZoomControl,
   useMap,
   useMapEvents,
 } from 'react-leaflet';
@@ -35,6 +36,7 @@ type JuliacaMapProps = {
   focus: MapFocus;
   onCenterChange: (point: GeoPoint) => void;
   onSelectRequest: (id: string) => void;
+  onSelectUnit: (id: string) => void;
   pickupRoute: GeoPoint[];
   serviceRoute: GeoPoint[];
 };
@@ -126,6 +128,7 @@ export function JuliacaMap({
   focus,
   onCenterChange,
   onSelectRequest,
+  onSelectUnit,
   pickupRoute,
   serviceRoute,
 }: JuliacaMapProps) {
@@ -151,9 +154,10 @@ export function JuliacaMap({
       ]}
       maxBoundsViscosity={0.82}
       className={s.realMap}
-      zoomControl
+      zoomControl={false}
       attributionControl
     >
+      <ZoomControl position="topright" />
       <TileLayer
         attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
         url={process.env.NEXT_PUBLIC_TILE_URL || 'https://tile.openstreetmap.org/{z}/{x}/{y}.png'}
@@ -176,6 +180,7 @@ export function JuliacaMap({
             position={[point.lat, point.lng]}
             icon={unitIcons[unit.id]}
             zIndexOffset={unit.id === activeUnitId ? 500 : 0}
+            eventHandlers={{ click: () => onSelectUnit(unit.id) }}
           />
         );
       })}

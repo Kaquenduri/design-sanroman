@@ -3,6 +3,7 @@
 import {
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from 'react';
 import dynamic from 'next/dynamic';
@@ -18,6 +19,8 @@ import {
   Navigation,
   Phone,
   PhoneCall,
+  PanelLeftOpen,
+  PanelRightOpen,
   Search,
   Smartphone,
   UserRound,
@@ -81,6 +84,7 @@ type QueueFilter = 'all' | 'pending' | 'assigned';
 type PickingMode = 'new-pickup' | 'new-destination' | 'selected' | null;
 type PaymentMethod = PendingRequest['paymentMethod'];
 type SearchField = 'pickup' | 'destination';
+type UnitMapFilter = 'all' | 'active' | 'on-trip' | 'offline' | 'blocked';
 
 const NEW_PICKUP = seededPoint(801);
 
@@ -133,9 +137,13 @@ function nearestUnit(point: GeoPoint, requests: PendingRequest[], jobs: Dispatch
 
 export function DispatcherView() {
   const [requests, setRequests] = useState<PendingRequest[]>(REQUESTS_INITIAL);
-  const [selectedId, setSelectedId] = useState<string | null>(
-    REQUESTS_INITIAL[0].id
-  );
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [queueOpen, setQueueOpen] = useState(false);
+  const [detailOpen, setDetailOpen] = useState(false);
+  const [unitFilter, setUnitFilter] = useState<UnitMapFilter>('all');
+  const [selectedUnitId, setSelectedUnitId] = useState<string | null>(null);
+  const queueTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const detailTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [filter, setFilter] = useState<QueueFilter>('all');
   const [tick, setTick] = useState(0);
   const [nowMs, setNowMs] = useState<number | null>(null);
@@ -154,6 +162,11 @@ export function DispatcherView() {
   const [jobs, setJobs] = useState<DispatchJob[]>([]);
 
   useEffect(() => subscribeDispatchJobs(setJobs), []);
+
+  useEffect(() => () => {
+    if (queueTimer.current) clearTimeout(queueTimer.current);
+    if (detailTimer.current) clearTimeout(detailTimer.current);
+  }, []);
 
   useEffect(() => {
     setNowMs(Date.now());
@@ -194,7 +207,7 @@ export function DispatcherView() {
   const suggestedDriver = suggestedUnit
     ? DRIVERS.find((driver) => driver.id === suggestedUnit.driverId) ?? null
     : null;
-  const activeUnitId = assignedUnit?.id ?? selectedJob?.offer?.unitId ?? suggestedUnit?.id ?? null;
+  const activeUnitId = selectedUnitId ?? assignedUnit?.id ?? selectedJob?.offer?.unitId ?? suggestedUnit?.id ?? null;
   const selectedDestinationGeo = selected
     ? selected.destinationGeo ?? worldToGeo(selected.destination)
     : null;
@@ -220,6 +233,36 @@ export function DispatcherView() {
           request.assignedUnitId === unit.id && request.id !== selectedId
       )
   );
+
+  const visibleUnits = unitFilter === 'all'
+    ? UNITS
+    : UNITS.filter((unit) => unit.status === unitFilter);
+
+  const revealQueue = (autoClose = true) => {
+    setQueueOpen(true);
+    if (queueTimer.current) clearTimeout(queueTimer.current);
+    if (autoClose) queueTimer.current = setTimeout(() => setQueueOpen(false), 6500);
+  };
+
+  const revealDetail = (autoClose = true) => {
+    setDetailOpen(true);
+    if (detailTimer.current) clearTimeout(detailTimer.current);
+    if (autoClose) detailTimer.current = setTimeout(() => setDetailOpen(false), 8500);
+  };
+
+  const selectRequest = (id: string) => {
+    setSelectedId(id);
+    setSelectedUnitId(null);
+    const request = requests.find((item) => item.id === id);
+    if (request) focusMap(request.pickupGeo ?? worldToGeo(request.pickup), 16);
+    setQueueOpen(false);
+    revealDetail();
+  };
+
+  const selectUnit = (unitId: string) => {
+    setSelectedUnitId(unitId);
+    focusMap(worldToGeo(UNIT_POSITIONS[unitId]), 17);
+  };
 
   const updateSelected = (change: Partial<PendingRequest>) => {
     if (!selectedId) return;
@@ -450,11 +493,16 @@ export function DispatcherView() {
     setDraft(INITIAL_DRAFT);
     setIntakeOpen(false);
     setPicking(null);
+    revealQueue();
+    setTimeout(() => {
+      setQueueOpen(false);
+      revealDetail();
+    }, 2400);
   };
 
   return (
     <div className={s.dispatcher}>
-      <aside className={`${s.col} ${s.colQueue}`} aria-label="Cola de llamadas">
+      <aside className={`${s.col} ${s.colQueue} ${queueOpen ? s.drawerOpen : s.drawerClosed}`} aria-label="Cola de llamadas">
         <div className={s.colHead}>
           <div className={s.queueHeadRow}>
             <div>
@@ -477,6 +525,9 @@ export function DispatcherView() {
               {intakeOpen ? <X size={15} /> : <PhoneCall size={15} />}
               {intakeOpen ? 'Cerrar' : 'Nueva llamada'}
             </Button>
+            <IconButton variant="neutral" size="sm" onClick={() => setQueueOpen(false)} aria-label="Ocultar llamadas">
+              <X size={15} />
+            </IconButton>
           </div>
         </div>
 
@@ -736,13 +787,7 @@ export function DispatcherView() {
                     <button
                       key={request.id}
                       className={`${s.qItem} ${active ? s.qActive : ''}`}
-                      onClick={() => {
-                        setSelectedId(request.id);
-                        focusMap(
-                          request.pickupGeo ?? worldToGeo(request.pickup),
-                          16
-                        );
-                      }}
+                      onClick={() => selectRequest(request.id)}
                       aria-pressed={active}
                     >
                       <div className={s.qTop}>
@@ -813,7 +858,7 @@ export function DispatcherView() {
 
       <section className={s.mapZone} aria-label="Mapa interactivo de Juliaca">
         <JuliacaMap
-          units={UNITS}
+          units={visibleUnits}
           unitPositions={UNIT_POSITIONS}
           requests={requests}
           selectedId={selectedId}
@@ -821,13 +866,8 @@ export function DispatcherView() {
           picking={Boolean(picking)}
           focus={mapFocus}
           onCenterChange={setMapCenter}
-          onSelectRequest={(id) => {
-            setSelectedId(id);
-            const request = requests.find((item) => item.id === id);
-            if (request) {
-              focusMap(request.pickupGeo ?? worldToGeo(request.pickup), 16);
-            }
-          }}
+          onSelectRequest={selectRequest}
+          onSelectUnit={selectUnit}
           pickupRoute={pickupRoute.route?.points ?? []}
           serviceRoute={serviceRoute.route?.points ?? []}
         />
@@ -844,6 +884,18 @@ export function DispatcherView() {
                 : serviceRoute.loading ? 'Calculando ruta vial…' : 'Ruta temporalmente no disponible'
               : 'Arrastra el mapa y usa la rueda para acercar'}
           </span>
+        </div>
+
+        <div className={s.mapPanelControls}>
+          <button className={`${s.panelToggle} ${queueOpen ? s.panelToggleActive : ''}`} onClick={() => queueOpen ? setQueueOpen(false) : revealQueue(false)} aria-pressed={queueOpen}>
+            <PanelLeftOpen size={18} />
+            <span>Llamadas</span>
+            <b>{requests.filter((item) => !item.assignedUnitId).length}</b>
+          </button>
+          <button className={`${s.panelToggle} ${detailOpen ? s.panelToggleActive : ''}`} onClick={() => detailOpen ? setDetailOpen(false) : revealDetail(false)} aria-pressed={detailOpen} disabled={!selected}>
+            <PanelRightOpen size={18} />
+            <span>Servicio</span>
+          </button>
         </div>
 
         {picking && (
@@ -863,16 +915,33 @@ export function DispatcherView() {
           </div>
         )}
 
-        <div className={s.mapLegend}>
-          <Legend tone="success">Disponible</Legend>
-          <Legend tone="brand">En viaje</Legend>
-          <Legend tone="offline">Sin conexión</Legend>
-          <Legend tone="danger">Bloqueada</Legend>
+        <div className={s.mapLegend} aria-label="Filtrar unidades por estado">
+          <Legend tone="all" value="all" active={unitFilter === 'all'} onClick={(value) => { setUnitFilter(value); setSelectedUnitId(null); }}>Todos</Legend>
+          <Legend tone="success" value="active" active={unitFilter === 'active'} onClick={(value) => { setUnitFilter(value); setSelectedUnitId(null); }}>Disponibles</Legend>
+          <Legend tone="brand" value="on-trip" active={unitFilter === 'on-trip'} onClick={(value) => { setUnitFilter(value); setSelectedUnitId(null); }}>Ocupados</Legend>
+          <Legend tone="offline" value="offline" active={unitFilter === 'offline'} onClick={(value) => { setUnitFilter(value); setSelectedUnitId(null); }}>Sin señal</Legend>
+          <Legend tone="danger" value="blocked" active={unitFilter === 'blocked'} onClick={(value) => { setUnitFilter(value); setSelectedUnitId(null); }}>Bloqueados</Legend>
+        </div>
+
+        <div className={s.unitTray} aria-label="Unidades en el mapa">
+          <div className={s.unitTrayHead}>
+            <span>Unidades</span>
+            <small>{visibleUnits.length} visibles</small>
+          </div>
+          <div className={s.unitTrayList}>
+            {visibleUnits.map((unit) => (
+              <button key={unit.id} className={`${s.unitTrayItem} ${activeUnitId === unit.id ? s.unitTrayItemActive : ''}`} onClick={() => selectUnit(unit.id)} aria-pressed={activeUnitId === unit.id}>
+                <span className={`${s.unitStatusDot} ${s[`unitStatus${unit.status}`]}`} />
+                <UnitBadge n={unit.n} size="sm" />
+                <span><strong>{unit.placa}</strong><small>{unit.marca} {unit.modelo}</small></span>
+              </button>
+            ))}
+          </div>
         </div>
       </section>
 
       <aside
-        className={`${s.col} ${s.colDetail}`}
+        className={`${s.col} ${s.colDetail} ${detailOpen ? s.drawerOpen : s.drawerClosed}`}
         aria-label="Detalle del servicio"
       >
         {!selected ? (
@@ -885,9 +954,14 @@ export function DispatcherView() {
         ) : (
           <>
             <div className={s.colHead}>
-              <div className={s.colTitle}>{selected.passengerName}</div>
-              <div className={s.colSub}>
-                #{selected.id} · llamada telefónica
+              <div className={s.detailHeadRow}>
+                <div>
+                  <div className={s.colTitle}>{selected.passengerName}</div>
+                  <div className={s.colSub}>#{selected.id} · llamada telefónica</div>
+                </div>
+                <IconButton variant="neutral" size="sm" onClick={() => setDetailOpen(false)} aria-label="Ocultar detalle">
+                  <X size={15} />
+                </IconButton>
               </div>
             </div>
 
@@ -1091,15 +1165,21 @@ function PaymentChoice({
 
 function Legend({
   tone,
+  value,
+  active,
+  onClick,
   children,
 }: {
-  tone: 'success' | 'brand' | 'offline' | 'danger';
+  tone: 'all' | 'success' | 'brand' | 'offline' | 'danger';
+  value: UnitMapFilter;
+  active: boolean;
+  onClick: (value: UnitMapFilter) => void;
   children: string;
 }) {
   return (
-    <span className={s.legendItem}>
+    <button className={`${s.legendItem} ${active ? s.legendItemActive : ''}`} onClick={() => onClick(value)} aria-pressed={active}>
       <span className={`${s.legendSwatch} ${s[`legend${tone}`]}`} />
       {children}
-    </span>
+    </button>
   );
 }

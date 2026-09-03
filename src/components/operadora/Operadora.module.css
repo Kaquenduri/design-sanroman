@@ -321,10 +321,10 @@
 /* --------------------------------------------------- Vista de despacho --- */
 
 .dispatcher {
-  display: grid;
-  grid-template-columns: var(--queue-w) 1fr var(--detail-w);
+  position: relative;
   flex: 1;
   min-height: 0;
+  overflow: hidden;
 }
 
 .col {
@@ -335,12 +335,50 @@
 }
 
 .colQueue {
-  box-shadow: inset -1px 0 0 var(--border);
+  position: absolute;
+  z-index: 12;
+  top: var(--s-3);
+  bottom: var(--s-3);
+  left: var(--s-3);
+  width: min(var(--queue-w), calc(100% - var(--s-6)));
+  overflow: hidden;
+  border-radius: var(--r-xl);
+  background: var(--glass-strong);
+  box-shadow: inset 0 0 0 1px var(--glass-border), var(--sh-lg);
+  backdrop-filter: blur(22px) saturate(1.35);
+  transition: transform var(--t-slow) var(--ease), opacity var(--t-base) var(--ease);
 }
 
 .colDetail {
-  box-shadow: inset 1px 0 0 var(--border);
-  background: var(--bg);
+  position: absolute;
+  z-index: 12;
+  top: var(--s-3);
+  right: var(--s-3);
+  bottom: var(--s-3);
+  width: min(var(--detail-w), calc(100% - var(--s-6)));
+  overflow: hidden;
+  border-radius: var(--r-xl);
+  background: var(--glass-strong);
+  box-shadow: inset 0 0 0 1px var(--glass-border), var(--sh-lg);
+  backdrop-filter: blur(22px) saturate(1.35);
+  transition: transform var(--t-slow) var(--ease), opacity var(--t-base) var(--ease);
+}
+
+.drawerOpen {
+  transform: translateX(0);
+  opacity: 1;
+}
+
+.colQueue.drawerClosed {
+  transform: translateX(calc(-100% - var(--s-6)));
+  opacity: 0;
+  pointer-events: none;
+}
+
+.colDetail.drawerClosed {
+  transform: translateX(calc(100% + var(--s-6)));
+  opacity: 0;
+  pointer-events: none;
 }
 
 .colHead {
@@ -352,6 +390,13 @@
 .queueHeadRow {
   display: flex;
   align-items: center;
+  justify-content: space-between;
+  gap: var(--s-3);
+}
+
+.detailHeadRow {
+  display: flex;
+  align-items: flex-start;
   justify-content: space-between;
   gap: var(--s-3);
 }
@@ -741,7 +786,8 @@
 /* ---------------------------------------------------------- Zona mapa --- */
 
 .mapZone {
-  position: relative;
+  position: absolute;
+  inset: 0;
   background: var(--map-land);
   overflow: hidden;
 }
@@ -787,7 +833,7 @@
 .mapReset {
   position: absolute;
   top: 82px;
-  left: 12px;
+  right: 12px;
   z-index: 800;
   min-height: 30px;
   padding: 0 10px;
@@ -916,6 +962,7 @@
   gap: var(--s-2);
   z-index: 2;
   pointer-events: none;
+  padding-right: 92px;
 }
 
 .mapChip {
@@ -933,6 +980,77 @@
   color: var(--fg);
   pointer-events: auto;
   white-space: nowrap;
+}
+
+.mapPanelControls {
+  position: absolute;
+  top: 62px;
+  left: var(--s-3);
+  z-index: 7;
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-2);
+}
+
+@media (max-width: 760px) {
+  .mapOverlayTop {
+    right: 64px;
+    flex-wrap: wrap;
+    padding-right: 0;
+  }
+
+  .mapChip {
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .mapPanelControls {
+    top: 104px;
+  }
+}
+
+.panelToggle {
+  min-height: 42px;
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  padding: 0 var(--s-3);
+  border-radius: var(--r-full);
+  background: var(--glass-strong);
+  color: var(--fg-muted);
+  box-shadow: inset 0 0 0 1px var(--glass-border), var(--sh-md);
+  backdrop-filter: blur(18px) saturate(1.35);
+  transition: transform var(--t-fast) var(--ease), background var(--t-fast) var(--ease), color var(--t-fast) var(--ease);
+}
+
+.panelToggle:hover {
+  color: var(--fg);
+  transform: translateX(3px);
+}
+
+.panelToggle:disabled {
+  opacity: 0.42;
+  cursor: default;
+  transform: none;
+}
+
+.panelToggleActive {
+  background: var(--brand-600);
+  color: var(--brand-fg);
+}
+
+.panelToggle b {
+  min-width: 20px;
+  height: 20px;
+  display: grid;
+  place-items: center;
+  padding-inline: 5px;
+  border-radius: var(--r-full);
+  background: var(--danger);
+  color: var(--brand-fg);
+  font-family: var(--font-mono);
+  font-size: 9px;
 }
 
 .mapLiveDot {
@@ -1004,12 +1122,12 @@
 .mapLegend {
   position: absolute;
   left: var(--s-3);
-  bottom: 92px;
+  bottom: 174px;
   z-index: 2;
   display: flex;
-  gap: var(--s-4);
-  padding: 10px 14px;
-  border-radius: var(--r-md);
+  gap: var(--s-1);
+  padding: 6px;
+  border-radius: var(--r-full);
   background: var(--glass);
   backdrop-filter: blur(14px) saturate(1.3);
   box-shadow: inset 0 0 0 1px var(--glass-border), var(--sh-sm);
@@ -1021,6 +1139,23 @@
   display: flex;
   align-items: center;
   gap: 7px;
+  min-height: 32px;
+  padding: 0 10px;
+  border-radius: var(--r-full);
+  color: var(--fg-muted);
+  font-size: var(--text-xs);
+  transition: background var(--t-fast) var(--ease), color var(--t-fast) var(--ease);
+}
+
+.legendItem:hover {
+  color: var(--fg);
+  background: var(--surface-3);
+}
+
+.legendItemActive {
+  color: var(--fg);
+  background: var(--surface-4);
+  box-shadow: inset 0 0 0 1px var(--border-strong);
 }
 
 .legendSwatch {
@@ -1028,6 +1163,11 @@
   height: 10px;
   border-radius: 3px;
   flex-shrink: 0;
+}
+
+.legendall {
+  background: var(--fg);
+  box-shadow: 0 0 0 2px var(--fg-faint);
 }
 
 .legendsuccess {
@@ -1045,6 +1185,115 @@
 .legenddanger {
   background: var(--danger);
 }
+
+.unitTray {
+  position: absolute;
+  z-index: 6;
+  right: var(--s-3);
+  bottom: 82px;
+  left: var(--s-3);
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+  min-width: 0;
+  padding: 8px 10px;
+  border-radius: var(--r-lg);
+  background: var(--glass-strong);
+  box-shadow: inset 0 0 0 1px var(--glass-border), var(--sh-lg);
+  backdrop-filter: blur(20px) saturate(1.35);
+}
+
+.unitTrayHead {
+  width: 74px;
+  flex: 0 0 74px;
+  display: grid;
+  padding-left: var(--s-2);
+}
+
+.unitTrayHead span {
+  font-family: var(--font-display);
+  font-size: var(--text-sm);
+  font-weight: 750;
+}
+
+.unitTrayHead small {
+  color: var(--fg-subtle);
+  font-size: 9px;
+}
+
+.unitTrayList {
+  min-width: 0;
+  display: flex;
+  gap: var(--s-2);
+  overflow-x: auto;
+  padding: 2px;
+  scrollbar-width: none;
+}
+
+.unitTrayList::-webkit-scrollbar {
+  display: none;
+}
+
+.unitTrayItem {
+  position: relative;
+  min-width: 150px;
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  padding: 8px 10px;
+  border-radius: var(--r-md);
+  background: var(--surface-2);
+  color: var(--fg-muted);
+  box-shadow: inset 0 0 0 1px var(--border);
+  text-align: left;
+  transition: transform var(--t-fast) var(--ease), background var(--t-fast) var(--ease), box-shadow var(--t-fast) var(--ease);
+}
+
+.unitTrayItem:hover {
+  transform: translateY(-2px);
+  background: var(--surface-3);
+}
+
+.unitTrayItemActive {
+  background: var(--brand-600);
+  color: var(--brand-fg);
+  box-shadow: var(--sh-brand);
+}
+
+.unitTrayItem > span:last-child {
+  min-width: 0;
+  display: grid;
+}
+
+.unitTrayItem strong {
+  color: currentColor;
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+}
+
+.unitTrayItem small {
+  max-width: 82px;
+  overflow: hidden;
+  color: currentColor;
+  font-size: 9px;
+  opacity: 0.72;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.unitStatusDot {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 7px;
+  height: 7px;
+  border-radius: var(--r-full);
+}
+
+.unitStatusactive { background: var(--success); }
+.unitStatuson-trip { background: var(--brand-300); }
+.unitStatusoffline { background: var(--fg-faint); }
+.unitStatusblocked { background: var(--danger); }
 
 .mapTools {
   position: absolute;
@@ -1480,9 +1729,8 @@
 /* -------------------------------------------------- Adaptación a ancho --- */
 
 @media (max-width: 1400px) {
-  .dispatcher {
-    grid-template-columns: 320px 1fr 340px;
-  }
+  .colQueue { width: 320px; }
+  .colDetail { width: 340px; }
   .kpiGrid {
     grid-template-columns: repeat(2, 1fr);
   }
@@ -1494,12 +1742,7 @@
     left: 300px;
   }
 
-  .dispatcher {
-    grid-template-columns: 300px 1fr;
-  }
-  .colDetail {
-    display: none;
-  }
+  .colQueue { width: 300px; }
   .memGrid {
     grid-template-columns: 1fr;
   }
